@@ -1,4 +1,8 @@
-
+// =====================================================================
+// 1. KONSTRUKTOR & SUPABASE CONFIG
+// =====================================================================
+const { createClient } = supabase;
+const _supabase = createClient('https://ldkefnlnpgwgxznemzol.supabase.co', 'sb_publishable_VG1TQwsg40s9ngumFAy-CQ_ORaBQKHG');
 // =====================================================================
 // 1. KONSTRUKTOR & VARIABEL GLOBAL
 // =====================================================================
@@ -521,58 +525,91 @@ document.getElementById('btnUpdateRealisasi').onclick = function() {
 // 6. PENYIMPANAN & INITIALIZATION
 // =====================================================================
 
-const btnSave = document.getElementById('btnSave');
-btnSave.addEventListener('click', () => {
-    const data = Array.from(tableBody.querySelectorAll('tr')).map(row => {
+document.getElementById('btnSave').addEventListener('click', async () => {
+    const btn = document.getElementById('btnSave');
+    btn.innerText = "SAVING...";
+    btn.disabled = true;
+
+    // 1. Ambil semua data dari baris tabel
+    const rows = Array.from(tableBody.querySelectorAll('tr')).map((row, index) => {
         const cells = row.querySelectorAll('td');
         return {
-            level: row.getAttribute('data-level'),
-            rpdBulanan: row.dataset.rpdBulanan,
-            realisasiBulanan: row.dataset.realisasiBulanan,
+            sort_order: index, // Penting agar urutan baris tidak berantakan
+            level: parseInt(row.getAttribute('data-level')),
+            rpd_bulanan: row.dataset.rpdBulanan,
+            real_bulanan: row.dataset.realisasiBulanan,
             kode: cells[1].innerText.trim(),
             nama: cells[2].innerText,
-            pagu: cells[3].innerText,
-            blokir: cells[4].innerText,
-            rpd: cells[5].innerText,
-            realisasi: cells[6].innerText
+            pagu: getVal(cells[3].innerText),
+            blokir: getVal(cells[4].innerText),
+            rpd_total: getVal(cells[5].innerText),
+            real_total: getVal(cells[6].innerText)
         };
     });
-    localStorage.setItem('anggaranDataStorage', JSON.stringify(data));
-    // alert("Data Berhasil Disimpan.");
-});
 
-function loadDataFromStorage() {
-    const stored = localStorage.getItem('anggaranDataStorage');
-    if (!stored) return;
-    const data = JSON.parse(stored);
+    try {
+        // 2. Hapus data lama di Supabase (Overwriting)
+        // Note: Untuk aplikasi produksi, sebaiknya gunakan logic 'upsert'
+        await _supabase.from('anggaran').delete().neq('id', 0); 
+
+        // 3. Masukkan data baru
+        const { error } = await _supabase.from('anggaran').insert(rows);
+        
+        if (error) throw error;
+        alert("Data Berhasil Disinkronkan ke Cloud.");
+    } catch (err) {
+        console.error(err);
+        alert("Gagal menyimpan ke Cloud: " + err.message);
+    } finally {
+        btn.innerText = "SAVE";
+        btn.disabled = false;
+    }
+});
+async function loadDataFromSupabase() {
+    tableBody.innerHTML = "<tr><td colspan='9' class='text-center'>Memuat data dari server...</td></tr>";
+
+    const { data, error } = await _supabase
+        .from('anggaran')
+        .select('*')
+        .order('sort_order', { ascending: true });
+
+    if (error) {
+        alert("Gagal memuat data dari Cloud!");
+        return;
+    }
+
     tableBody.innerHTML = ""; 
+    if (!data || data.length === 0) return;
+
     data.forEach(item => {
         const row = document.createElement('tr');
         row.setAttribute('data-level', item.level);
-        row.dataset.rpdBulanan = item.rpdBulanan;
-        row.dataset.realisasiBulanan = item.realisasiBulanan;
-        const padding = parseInt(item.level) * 15;
-        const symbol = parseInt(item.level) > 0 ? '' : '';
-
+        row.dataset.rpdBulanan = item.rpd_bulanan;
+        row.dataset.realisasiBulanan = item.real_bulanan;
+        
+        const padding = item.level * 15;
+        
         row.innerHTML = `
             <td class="col-cb text-center"><input type="checkbox" class="row-checkbox"></td>
             <td class="col-kd" style="padding-left:${padding}px!important">
                 <div style="display:flex;align-items:center;">
-                    <span style="color:#808080;font-family:monospace;margin-right:5px">${symbol}</span>
-                    <span>${item.kode.replace('', '')}</span>
+                    <span style="color:#808080;font-family:monospace;margin-right:5px"></span>
+                    <span>${item.kode}</span>
                 </div>
             </td>
             <td class="col-nm">${item.nama}</td>
-            <td class="col-idr text-right">${item.pagu}</td>
-            <td class="col-idr text-right">${item.blokir}</td>
-            <td class="col-idr text-right">${item.rpd}</td>
-            <td class="col-idr text-right">${item.realisasi}</td>
+            <td class="col-idr text-right">${toRp(item.pagu)}</td>
+            <td class="col-idr text-right">${toRp(item.blokir)}</td>
+            <td class="col-idr text-right">${toRp(item.rpd_total)}</td>
+            <td class="col-idr text-right">${toRp(item.real_total)}</td>
             <td class="col-idr text-right">0</td>
             <td class="col-idr text-right">0</td>
         `;
         tableBody.appendChild(row);
     });
+
     updateMondas();
+    updateDashboardTotal();
 }
 // ====================== HAPUS BARIS =========================
 document.getElementById('btnDelete').addEventListener('click', () => {
@@ -704,12 +741,10 @@ function updateDashboardTotal() {
 
 // Inisialisasi saat halaman siap
 document.addEventListener('DOMContentLoaded', () => {
-    // 1. Muat data dari storage
-    loadDataFromStorage();
-    
-    // 2. Langsung hitung total untuk Con1 agar tidak 0 saat start
-    updateDashboardTotal();
+    // Muat dari Cloud, bukan localStorage
+    loadDataFromSupabase();
 });
+
 // ==================== EXPORT & IMPORT ==========================
 // --- FUNGSI EXPORT (JSON) ---
 function handleExport() {
