@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Anggaran Klasik - Monitoring</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div class="app-wrapper" id="mainApp">
+        <div class="MONDAS" id="containerTotal">
+            <div class="monitor-screen">
+                <div class="mon-box">
+                    <label>TOTAL PAGU</label>
+                    <span id="statTotalPagu">0</span>
+                </div>
+                <div class="mon-box">
+                    <label>TOTAL BLOKIR</label>
+                    <span id="statTotalBlokir" style="color: #00ff00;">0</span>
+                </div>
+                  <div class="mon-box">
+                    <label>TOTAL RPD</label>
+                    <span id="statTotalRPD" style="color: #00ff00;">0</span>
+                </div>
+                <div class="mon-box">
+                    <label>TOTAL REALISASI</label>
+                    <span id="statTotalRealisasi" style="color: #00ff00;">0</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="das1" id="containerToolbar">
+            <div class="toolbar">
+                <button type="button" class="btn-tool" id="btnMoveUp">MOVE</button>
+                <button type="button" class="btn-tool" id="btnSave">SAVE</button>
+                <button type="button" class="btn-tool" id="btnImport">IMPORT</button>
+                <button type="button" class="btn-tool" id="btnExport">EXPORT</button>
+                <button type="button" class="btn-tool-danger" id="btnDelete">DELETE</button>
+                <button type="button" class="btn-tool-alt" id="btnAddRow">TAMBAH</button>
+                <button type="button" class="btn-tool" id="btnEdit">EDIT</button>
+                <button type="button" class="btn-tool" id="btnRPD">RPD</button>
+                <button type="button" class="btn-tool" id="btnRealisasi">REALISASI</button>
+                <button type="button" class="btn-tool" id="btnDasboard">DASBOARD</button>
+            </div>
+        </div>
+
+        <div class="das2" id="containerTable">
+            <table class="list-bar" id="tableAnggaran">
+                <thead>
+                 <tr>
+                    <th class="col-cb"><input type="checkbox" id="checkAllMaster"></th>
+                    <th class="col-kd">KODE</th>
+                    <th class="col-nm">NAMA PROGRAM</th>
+                    <th class="col-idr">PAGU</th>
+                    <th class="col-idr">BLOKIR</th>
+                    <th class="col-idr">RPD</th>
+                    <th class="col-idr">REALISASI</th>
+                    <th class="col-idr">TOTAL</th>
+                    <th class="col-idr">SISA</th>
+                </thead>
+                    <tbody id="tableBody">
+                    </tbody>
+            </table>
+        </div>
+    </div>
+<div id="editModal" class="modal-overlay">
+    <div class="modal-window">
+        <div class="modal-header">
+            <span>EDIT DATA ANGGARAN</span>
+            <button class="btn-close" id="btnCloseModal">X</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label>KODE</label>
+                <input type="text" id="editKode">
+            </div>
+            <div class="form-group">
+                <label>NAMA PROGRAM</label>
+                <input type="text" id="editNama">
+            </div>
+            <div class="form-group">
+                <label>PAGU</label>
+                <input type="text" id="editPagu">
+            </div>
+            <div class="form-group">
+                <label>BLOKIR</label>
+                <input type="text" id="editBlokir">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-tool" id="btnUpdateData">SIMPAN</button>
+            <button class="btn-tool" id="btnCancelEdit">BATAL</button>
+        </div>
+    </div>
+</div>
+<div id="editModal" class="modal-overlay">
+    </div>
+<div id="rpdModal" class="modal-overlay" style="display:none;">
+    <div class="modal-window" style="width: 420px;">
+        <div class="modal-header">
+            <span>INPUT RPD 12 BULAN</span>
+            <button class="btn-close" onclick="document.getElementById('rpdModal').style.display='none'">X</button>
+        </div>
+
+        <div class="modal-body">
+            <div class="grid-rpd-container">
+                <div class="bulan-row"><label>JAN</label><input type="text" class="input-bulan"></div>
+                <div class="bulan-row"><label>FEB</label><input type="text" class="input-bulan"></div>
+                <div class="bulan-row"><label>MAR</label><input type="text" class="input-bulan"></div>
+                <div class="bulan-row"><label>APR</label><input type="text" class="input-bulan"></div>
+                <div class="bulan-row"><label>MEI</label><input type="text" class="input-bulan"></div>
+                <div class="bulan-row"><label>JUN</label><input type="text" class="input-bulan"></div>
+
+                <div class="bulan-row"><label>JUL</label><input type="text" class="input-bulan"></div>
+                <div class="bulan-row"><label>AGT</label><input type="text" class="input-bulan"></div>
+                <div class="bulan-row"><label>SEP</label><input type="text" class="input-bulan"></div>
+                <div class="bulan-row"><label>OKT</label><input type="text" class="input-bulan"></div>
+                <div class="bulan-row"><label>NOV</label><input type="text" class="input-bulan"></div>
+                <div class="bulan-row"><label>DES</label><input type="text" class="input-bulan"></div>
+            </div>
+
+            <div id="infoBarRPD" class="info-bar-horizontal">
+                <span>PAGU: 0</span>
+                <span>RPD: 0</span>
+                <span>SISA: 0</span>
+            </div>
+            
+            <input type="hidden" id="totalRPDInput" value="0">
+        </div>
+
+        <div class="modal-footer" style="padding: 15px; border-top: 1px solid #eee; text-align: right;">
+            <button class="btn-tool" id="btnUpdateRPD" style="background-color: #2ecc71; color: white;">SIMPAN</button>
+            <button class="btn-tool" onclick="document.getElementById('rpdModal').style.display='none'" style="background-color: #e74c3c; color: white;">BATAL</button>
+        </div>
+    </div>
+</div>
+<div id="realisasiModal" class="modal-overlay" style="display:none;">
+    <div class="modal-window" style="width: 420px;">
+        <div class="modal-header">
+            <span id="realisasiModalTitle">INPUT REALISASI 12 BULAN</span>
+            <button class="btn-close" onclick="document.getElementById('realisasiModal').style.display='none'">X</button>
+        </div>
+
+        <div class="modal-body">
+            <div class="grid-realisasi-container"> 
+                <div class="bulan-row"><label>JAN</label><input type="text" class="input-realisasi"></div>
+                <div class="bulan-row"><label>FEB</label><input type="text" class="input-realisasi"></div>
+                <div class="bulan-row"><label>MAR</label><input type="text" class="input-realisasi"></div>
+                <div class="bulan-row"><label>APR</label><input type="text" class="input-realisasi"></div>
+                <div class="bulan-row"><label>MEI</label><input type="text" class="input-realisasi"></div>
+                <div class="bulan-row"><label>JUN</label><input type="text" class="input-realisasi"></div>
+                
+                <div class="bulan-row"><label>JUL</label><input type="text" class="input-realisasi"></div>
+                <div class="bulan-row"><label>AGT</label><input type="text" class="input-realisasi"></div>
+                <div class="bulan-row"><label>SEP</label><input type="text" class="input-realisasi"></div>
+                <div class="bulan-row"><label>OKT</label><input type="text" class="input-realisasi"></div>
+                <div class="bulan-row"><label>NOV</label><input type="text" class="input-realisasi"></div>
+                <div class="bulan-row"><label>DES</label><input type="text" class="input-realisasi"></div>
+            </div>
+
+            <div id="infoBarRealisasi" class="info-bar-horizontal">
+                <span>RPD: 0</span>
+                <span>REALISASI: 0</span>
+                <span>SISA: 0</span>
+            </div>
+            
+            <input type="hidden" id="totalRealisasiInput" value="0">
+        </div>
+
+        <div class="modal-footer" style="padding: 15px; border-top: 1px solid #eee; text-align: right; display: flex; justify-content: flex-end; gap: 10px;">
+            <button class="btn-tool" id="btnUpdateRealisasi" style="background-color: #2ecc71; color: white;">SIMPAN</button>
+            <button class="btn-tool" onclick="document.getElementById('realisasiModal').style.display='none'" style="background-color: #e74c3c; color: white;">BATAL</button>
+        </div>
+    </div>
+</div>
+<div id="dashboardOverlay" class="modal-overlay" style="display: none; z-index: 9999;">
+    <div class="window" style="width: 850px; position: relative;">
+        <div class="title-bar">
+            <span></span>
+            <div class="close-btn" id="btnCloseDashboard">X</div>
+        </div>
+        <div class="content" style="background: #d4d0c8; padding: 20px;">
+            <div class="monitor-row" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px;">
+                <div class="mon-item">
+                    <label style="display:block; font-weight:bold; margin-bottom:5px;">RPD</label>
+                    <div class="screen" style="background:#000; color:#0f0; padding:10px; font-family:monospace; font-size:20px; border:3px inset #808080; border-radius:10px;">
+                        Rp. <span id="dashRPD">0</span>
+                    </div>
+                </div>
+                <div class="mon-item">
+                    <label style="display:block; font-weight:bold; margin-bottom:5px;">REALISASI</label>
+                    <div class="screen" style="background:#000; color:#0f0; padding:10px; font-family:monospace; font-size:20px; border:3px inset #808080; border-radius:10px;">
+                        Rp. <span id="dashReal">0</span>
+                    </div>
+                </div>
+                <div class="mon-item">
+                    <label style="display:block; font-weight:bold; margin-bottom:5px;">PERSENTASE</label>
+                    <div class="screen" style="background:#000; color:#0f0; padding:10px; font-family:monospace; font-size:20px; border:3px inset #808080; border-radius:10px; text-align:center;">
+                        <span id="dashPersen">0%</span>
+                    </div>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
+                <select id="dashPeriodSelect" style="background: #fff; border: 2px inset #808080; padding: 3px; font-family: Tahoma; font-size: 12px; width: 150px;">
+                    <option value="TAHUNAN">TAHUNAN</option>
+                    <option value="0">JANUARI</option>
+                    <option value="1">FEBRUARI</option>
+                    <option value="2">MARET</option>
+                    <option value="3">APRIL</option>
+                    <option value="4">MEI</option>
+                    <option value="5">JUNI</option>
+                    <option value="6">JULI</option>
+                    <option value="7">AGUSTUS</option>
+                    <option value="8">SEPTEMBER</option>
+                    <option value="9">OKTOBER</option>
+                    <option value="10">NOVEMBER</option>
+                    <option value="11">DESEMBER</option>
+                </select>
+            </div>
+            <table class="rekap-table">
+                <thead>
+                    <tr style="background:#d4d0c8;">
+                        <th style="width:30%;">URAIAN</th>
+                        <th style="width:18%;">RPD</th>
+                        <th style="width:18%;">REALISASI</th>
+                        <th style="width:18%;">SISA</th>
+                        <th style="width:10%;">%</th>
+                    </tr>
+                </thead>
+                <tbody id="dashTableBody">
+                    <tr style="background:#e8e8e8; font-weight:bold;">
+                        <td colspan="5" style="text-align:left; padding-left:10px;">A. BERDASARKAN JENIS BELANJA</td>
+                    </tr>
+                    <tr>
+                        <td style="text-align:left; padding-left:20px;">Belanja Pegawai</td>
+                        <td id="dashPeg_RPD">0</td>
+                        <td id="dashPeg_Real">0</td>
+                        <td id="dashPeg_Sisa">0</td>
+                        <td id="dashPeg_Persen">0%</td>
+                    </tr>
+                    <tr>
+                        <td style="text-align:left; padding-left:20px;">Belanja Barang</td>
+                        <td id="dashBar_RPD">0</td>
+                        <td id="dashBar_Real">0</td>
+                        <td id="dashBar_Sisa">0</td>
+                        <td id="dashBar_Persen">0%</td>
+                    </tr>
+                    <tr>
+                        <td style="text-align:left; padding-left:20px;">Belanja Modal</td>
+                        <td id="dashMod_RPD">0</td>
+                        <td id="dashMod_Real">0</td>
+                        <td id="dashMod_Sisa">0</td>
+                        <td id="dashMod_Persen">0%</td>
+                    </tr>
+                    <tr style="background:#d4d0c8; font-weight:bold; font-style:italic;">
+                        <td style="text-align:right;">TOTAL :</td>
+                        <td id="subTotalJenis_RPD">0</td>
+                        <td id="subTotalJenis_Real">0</td>
+                        <td id="subTotalJenis_Sisa">0</td>
+                        <td id="subTotalJenis_Persen">0%</td>
+                    </tr>
+
+                    <tr style="background:#e8e8e8; font-weight:bold;">
+                        <td colspan="5" style="text-align:left; padding-left:10px;">B. BERDASARKAN SUMBER DANA</td>
+                    </tr>
+                    <tr>
+                        <td style="text-align:left; padding-left:20px;">Rupiah Murni (RM)</td>
+                        <td id="dashRM_RPD">0</td>
+                        <td id="dashRM_Real">0</td>
+                        <td id="dashRM_Sisa">0</td>
+                        <td id="dashRM_Persen">0%</td>
+                    </tr>
+                    <tr>
+                        <td style="text-align:left; padding-left:20px;">PNBP (PNP)</td>
+                        <td id="dashPNBP_RPD">0</td>
+                        <td id="dashPNBP_Real">0</td>
+                        <td id="dashPNBP_Sisa">0</td>
+                        <td id="dashPNBP_Persen">0%</td>
+                    </tr>
+                    <tr style="background:#d4d0c8; font-weight:bold; font-style:italic;">
+                        <td style="text-align:right;">TOTAL :</td>
+                        <td id="subTotalSumber_RPD">0</td>
+                        <td id="subTotalSumber_Real">0</td>
+                        <td id="subTotalSumber_Sisa">0</td>
+                        <td id="subTotalSumber_Persen">0%</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+<script src="script.js"></script>
+</body>
+</html>

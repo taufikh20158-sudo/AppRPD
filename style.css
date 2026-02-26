@@ -1,0 +1,548 @@
+/* --- Root & Reset --- */
+:root {
+    --bg-main: #008080;       /* Teal Klasik */
+    --win-gray: #d4d0c8;      /* Abu-abu Windows */
+    --win-dark: #808080;
+    --win-light: #ffffff;
+    --neon-green: #00ff00;    /* Text Dashboard */
+    --danger: #800000;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: "Tahoma", "Segoe UI", sans-serif;
+}
+
+/* Update pada Body */
+body {
+    background-color: var(--bg-main);
+    padding: 20px;
+    font-size: 12px;
+    height: 100vh; /* Paksa tinggi seukuran layar */
+    overflow: hidden; /* Hilangkan scroll di master/body */
+}
+
+/* Update pada Wrapper */
+.app-wrapper {
+    max-width: 1250px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    height: calc(100vh - 40px); /* Kurangi padding body (20px top + 20px bottom) */
+}
+
+/* --- MONDAS (Dashboard Section) --- */
+.MONDAS {
+    background: var(--win-gray);
+    padding: 4px;
+    border: 2px solid;
+    border-color: var(--win-light) var(--win-dark) var(--win-dark) var(--win-light);
+}
+
+.monitor-screen {
+    background: #000;
+    border: 3px inset var(--win-dark);
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px; /* Garis antar box */
+    padding: 10px;
+}
+
+.mon-box {
+    padding: 5px 15px;
+    border-right: 1px solid #fcfbfb;
+}
+
+.mon-box:last-child { border-right: none; }
+
+.mon-box label {
+    display: block;
+    color: #888;
+    font-size: 10px;
+    font-weight: bold;
+    margin-bottom: 4px;
+}
+
+.mon-box span {
+    color: var(--neon-green);
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 20px;
+    font-weight: bold;
+    text-shadow: 0 0 5px rgba(0, 255, 0, 0.5);
+}
+
+/* --- DAS 1 (Toolbar Section) --- */
+.das1 {
+    background: var(--win-gray);
+    padding: 6px;
+    border: 2px solid;
+    border-color: var(--win-light) var(--win-dark) var(--win-dark) var(--win-light);
+}
+
+.toolbar {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.btn-tool, .btn-tool-danger, .btn-tool-alt {
+    padding: 4px 10px;
+    cursor: pointer;
+    background: var(--win-gray);
+    border: 2px solid;
+    border-color: var(--win-light) var(--win-dark) var(--win-dark) var(--win-light);
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+}
+
+.btn-tool:active, .btn-tool-danger:active, .btn-tool-alt:active {
+    border-color: var(--win-dark) var(--win-light) var(--win-light) var(--win-dark);
+    padding: 5px 9px 3px 11px;
+}
+
+/* .btn-tool-danger { color: var(--danger); }
+.btn-tool-alt { color: #000080; } */
+
+/* ==================================================DAS2==================================================== */
+/* --- DAS 2 (Table Section) --- */
+/* Update pada DAS 2 (Table Section) */
+.das2 {
+    background: var(--win-light);
+    border: 2px inset var(--win-dark);
+    flex-grow: 1;         /* KUNCI: Mengambil sisa ruang layar */
+    overflow-y: auto;     /* Aktifkan scroll hanya di sini */
+    overflow-x: auto;     /* Jaga-jaga jika tabel terlalu lebar ke samping */
+    min-height: 200px;    /* Batas minimal agar tidak hilang */
+    position: relative;
+}
+.list-bar {
+    width: 100%;
+    border-collapse: collapse;
+    /* Menjaga lebar kolom tetap konsisten walau konten bertambah */
+    table-layout: fixed; 
+}
+
+/* --- Header Styling --- */
+.list-bar thead th {
+    background: var(--win-gray);
+    padding: 10px 8px;
+    border: 1px solid var(--win-dark);
+    position: sticky;     /* Header terkunci di atas */
+    top: 0;               /* Jarak dari atas kontainer .das2 */
+    z-index: 10;
+    box-shadow: inset 1px 1px var(--win-light);
+    font-size: 11px;
+    text-align: center;
+}
+
+/* --- Body Cell Styling --- */
+.list-bar tbody td {
+    padding: 6px 8px;
+    border: 1px solid #e0e0e0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: middle; /* Tengah secara vertikal */
+}
+
+/* --- Pengaturan Lebar Kolom Statis (Symmetry Lock) --- */
+
+/* 1. Kolom Checkbox: Paksa ke Tengah */
+.list-bar th:nth-child(1), 
+.list-bar td:nth-child(1) { 
+    width: 45px; 
+    text-align: center;
+}
+
+.list-bar td:nth-child(1) {
+    display: flex;         /* Aktifkan Flex */
+    justify-content: center; /* Center Horizontal */
+    align-items: center;     /* Center Vertikal */
+    padding: 0;            /* Hapus padding agar tidak offset */
+    height: 32px;          /* Sesuaikan dengan tinggi baris */
+}
+
+/* 2. Kolom Kode: Tetap & Stabil */
+.list-bar th:nth-child(2), 
+.list-bar td:nth-child(2) { 
+    width: 130px; 
+}
+
+/* 3. Kolom Nama Program: Fleksibel */
+.list-bar th:nth-child(3), 
+.list-bar td:nth-child(3) { 
+    width: auto; 
+}
+
+/* 4. Kolom Angka (Pagu s/d Sisa) */
+.list-bar th:nth-child(n+4), 
+.list-bar td:nth-child(n+4) { 
+    width: 115px; 
+}
+
+/* --- Baris dan Teks --- */
+.list-bar td:nth-child(n+4) {
+    text-align: right;
+    font-family: 'Courier New', Courier, monospace;
+    font-weight: bold;
+    color: #000;
+}
+
+.list-bar tbody tr:nth-child(even) { background: #f5f5f5; }
+.list-bar tbody tr:hover { background: #ffffdd; }
+
+/* Menghilangkan margin default checkbox */
+.row-checkbox {
+    margin: 0 !important;
+    cursor: pointer;
+}
+/* --- Penanda Visual Level 0 --- */
+tr[data-level="0"] {
+    font-weight: bold !important;
+    background-color: #ffffff;
+}
+/*=========== BARIS LEVL0 BOLD ============
+/* 1. SERAGAMKAN FONT & WARNA (Berlaku untuk SEMUA Level) */
+#tableBody tr td {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
+    color: #000000 !important; /* Pastikan semua teks berwarna putih/terang */
+    font-weight: 400;           /* Setel default semua level jadi TIPIS */
+    font-size: 13px;            /* Ukuran standar */
+}
+
+/* 2. KHUSUS LEVEL 0: DIBUAT BOLD */
+#tableBody tr[data-level="0"] td {
+    font-weight: 800 !important; /* Hanya level 0 yang tebal */
+    font-size: 13px;             /* Sedikit lebih besar agar dominan */
+}
+/* 4. ATUR PERATAAN ANGKA (PAGU, RPD, REALISASI, SISA) */
+/* Menggunakan tabular-nums agar angka sejajar rapi ke bawah */
+#tableBody tr td:nth-child(n+4) {
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    padding-right: 15px;
+}
+/*=========== FORM EDIT ===========
+
+/* Overlay Gelap di Belakang */
+.modal-overlay {
+    display: none; /* Sembunyikan default */
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Jendela Modal Gaya Windows */
+.modal-window {
+    background: var(--win-gray);
+    border: 2px solid;
+    border-color: var(--win-light) var(--win-dark) var(--win-dark) var(--win-light);
+    width: 400px;
+    padding: 2px;
+}
+
+.modal-header {
+    background: #000080;
+    color: white;
+    padding: 4px 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: bold;
+}
+
+.btn-close {
+    background: var(--win-gray);
+    border: 1px solid black;
+    width: 18px; height: 18px;
+    font-size: 10px; cursor: pointer;
+}
+
+.modal-body {
+    padding: 15px;
+}
+
+.form-group {
+    margin-bottom: 10px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 4px;
+}
+
+.form-group input {
+    width: 100%;
+    padding: 4px;
+    border: 2px inset var(--win-dark);
+}
+
+.modal-footer {
+    padding: 10px;
+    text-align: right;
+    display: flex;
+    gap: 5px;
+    justify-content: flex-end;
+}
+/* ============ FORM RPD ==============
+/* Container utama input bulan */
+.grid-rpd-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr; /* Membagi dua kolom sama besar */
+    grid-template-rows: repeat(6, auto); /* Memaksa maksimal 6 baris per kolom */
+    grid-auto-flow: column; /* Mengisi kolom ke bawah dulu, baru ke samping */
+    gap: 10px; /* Jarak antar input */
+    margin-bottom: 15px;
+}
+.grid-realisasi-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr; /* 2 Kolom */
+    grid-template-rows: repeat(6, auto); /* 6 Baris */
+    grid-auto-flow: column; /* Mengisi Jan-Jun di kolom 1, baru Jul-Des di kolom 2 */
+    gap: 10px;
+    padding: 10px 0;
+}
+.grid-rpd {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr); /* Membagi 2 kolom sama besar */
+    gap: 8px 20px;
+    padding: 10px;
+    max-width: 400px;
+    margin: 0 auto;
+}
+
+/* Row bulan (Label & Input) */
+.bulan-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.bulan-row label {
+    font-size: 11px;
+    font-weight: bold;
+    width: 35px;
+}
+
+.bulan-row input {
+    width: 90px;
+    text-align: right;
+    padding: 2px 5px;
+    font-family: monospace;
+}
+
+/* Baris Info Horizontal (Pagu, RPD, Sisa) */
+.info-bar-horizontal {
+    display: flex;
+    justify-content: space-between;
+    background: #000080; /* Biru Klasik */
+    color: white;
+    padding: 8px 12px;
+    margin-top: 15px;
+    font-size: 11px;
+    border: 2px inset #fff;
+    grid-column: span 2; /* Menghuni 2 kolom sekaligus */
+}
+
+/* Warna Sisa di dalam Info Bar */
+.text-sisa-aman { color: #aaffaa; }
+.text-sisa-bahaya { color: #ffb3b3; font-weight: bold; }
+/*========= FORM REALISASI =============
+/* --- CSS UNTUK MODAL RPD & REALISASI (IDENTIK) --- */
+
+/* Container Utama untuk 12 Bulan */
+.grid-rpd, .grid-realisasi {
+    display: grid;
+    grid-template-columns: 1fr 1fr; /* Membagi Jan-Jun dan Jul-Des */
+    gap: 8px 15px;
+    padding: 10px;
+    max-width: 400px;
+    margin: 0 auto;
+}
+
+/* Pengaturan Baris Bulan (Label & Input) */
+.bulan-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #ccc; /* Garis tipis pembatas */
+    padding-bottom: 2px;
+}
+
+.bulan-row label {
+    font-size: 11px;
+    font-weight: bold;
+    width: 35px;
+    color: #333;
+}
+
+.bulan-row input {
+    width: 100px;
+    text-align: right;
+    padding: 2px 5px;
+    font-family: 'Courier New', monospace;
+    border: 1px inset #808080;
+    background-color: #fff;
+}
+
+/* Baris Info Horizontal (Pagu, RPD/Real, Sisa) */
+.info-bar-horizontal {
+    grid-column: span 2; /* Full width di bawah dua kolom */
+    display: flex;
+    justify-content: space-between;
+    background: #000080; /* Biru Windows Klasik */
+    color: white;
+    padding: 8px 12px;
+    margin-top: 15px;
+    font-size: 11px;
+    border: 2px inset #ffffff;
+    box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
+}
+
+/* Styling Khusus untuk Angka Sisa */
+.text-sisa-aman { 
+    color: #00ff00; 
+    font-weight: bold; 
+}
+
+.text-sisa-bahaya { 
+    color: #ff5555; 
+    font-weight: bold; 
+    text-decoration: underline;
+}
+
+/* Styling Modal Window agar pas dengan 2 kolom */
+#rpdModal .modal-window, 
+#realisasiModal .modal-window {
+    width: 420px;
+    min-width: 420px;
+}
+/* Styling Bayangan RPD di Form Realisasi */
+.input-realisasi::placeholder {
+    color: #a0a0a0; /* Abu-abu pudar */
+    font-style: italic;
+    font-size: 10px;
+    opacity: 0.7;
+}
+
+/* Mempertegas kotak input saat aktif */
+.input-realisasi:focus {
+    background-color: #fffde7; /* Kuning sangat muda saat diketik */
+    border: 1px solid #000080;
+    outline: none;
+}
+
+/* Baris Judul Biru */
+.title-bar {
+    background: #000080; /* Biru Windows Klasik */
+    color: white;
+    padding: 2px 4px;
+    height: 22px;
+    display: flex;
+    justify-content: space-between; /* Kunci: Judul kiri, X kanan */
+    align-items: center;
+    box-sizing: border-box;
+}
+
+.title-bar span {
+    font-weight: bold;
+    font-size: 11px;
+    font-family: 'Tahoma', sans-serif;
+    pointer-events: none;
+}
+
+/* Tombol X (Keluar) */
+.close-btn {
+    cursor: pointer;
+    background: var(--win-gray);
+    color: black;
+    border: 1px solid #000;
+    width: 16px;
+    height: 14px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 9px;
+    font-weight: bold;
+    box-shadow: inset 1px 1px var(--win-light), inset -1px -1px var(--win-dark);
+    line-height: 1;
+}
+
+/* Efek Tombol Saat Diklik */
+.close-btn:active {
+    box-shadow: inset 1px 1px var(--win-dark), inset -1px -1px var(--win-light);
+    padding: 1px 0 0 1px;
+}
+/* Gabungkan semua properti rekap-table di sini */
+/* Pastikan tabel menggunakan model border collapse yang kuat */
+.rekap-table {
+    width: 100%;
+    border-collapse: collapse !important;
+    background: #fff;
+    table-layout: fixed;
+    border: 1px solid #808080 !important;
+}
+
+/* KUNCI: Paksa semua TH dan TD punya border di semua sisi */
+.rekap-table th, 
+.rekap-table td {
+    border: 1px solid #808080 !important; /* Memberi garis abu-abu tegas */
+    padding: 8px;
+    font-size: 11px;
+    height: 30px;
+    box-sizing: border-box; /* Mencegah border memakan ruang sel */
+    overflow: hidden;
+}
+
+/* Background khusus kolom Total & Persen agar terlihat berbeda tapi tetap bergaris */
+.total-col {
+    background-color: #f0f0f0 !important;
+    font-weight: bold;
+}
+
+.persen-col {
+    background-color: #e8e8e8 !important;
+    text-align: center;
+}
+
+input:focus {
+    outline: 1px dotted #000; /* Titik-titik khas Windows saat fokus */
+    outline-offset: -3px;
+}
+
+/* Scrollbar bergaya retro untuk .das2 */
+.das2::-webkit-scrollbar {
+    width: 16px;
+}
+.das2::-webkit-scrollbar-track {
+    background: var(--win-gray);
+    box-shadow: inset 1px 1px var(--win-light), inset -1px -1px var(--win-dark);
+}
+.das2::-webkit-scrollbar-thumb {
+    background: var(--win-gray);
+    border: 2px solid;
+    border-color: var(--win-light) var(--win-dark) var(--win-dark) var(--win-light);
+}
+/* Warna dasar baris saat dicentang */
+tr.row-selected {
+    background-color: #fff9c4 !important; /* Kuning muda lembut */
+    transition: background-color 0.3s ease;
+}
+
+/* Warna saat kursor melewati baris yang sudah dipilih */
+tr.row-selected:hover {
+    background-color: #fff59d !important; /* Sedikit lebih gelap saat hover */
+}
+
+/* Pastikan checkbox yang aktif terlihat jelas */
+.row-checkbox:checked {
+    accent-color: #fbc02d; /* Warna kuning emas untuk kotak centangnya */
+}
