@@ -995,3 +995,4 @@ tableBody.addEventListener('click', function(e) {
         cb.dispatchEvent(new Event('change', { bubbles: true }));
     }
 });
+
