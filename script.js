@@ -6,6 +6,7 @@ const _supabase = createClient('https://ldkefnlnpgwgxznemzol.supabase.co', 'sb_p
 // =====================================================================
 // 1. KONSTRUKTOR & VARIABEL GLOBAL
 // =====================================================================
+let debounceTimer;
 const tableBody = document.getElementById('tableBody');
 const btnAddRow = document.getElementById('btnAddRow');
 const editModal = document.getElementById('editModal');
@@ -143,83 +144,104 @@ document.getElementById('btnMoveUp').addEventListener('click', () => {
 // =====================================================================
 // 4. SISTEM PERHITUNGAN & HIERARKI (MONDAS)
 // =====================================================================
-
 function calculateRowTotal(row) {
-    const cells = row.querySelectorAll('td');
-    const pagu = getVal(cells[3].innerText);
-    const blokir = getVal(cells[4].innerText);
-    const realisasi = getVal(cells[6].innerText);
+    // Menggunakan .cells untuk performa akses DOM maksimal
+    const c = row.cells;
+    
+    // 1. Ambil nilai dasar dari kolom-kolom terkait
+    const pagu      = getVal(c[3].textContent); // Index 3: Pagu
+    const blokir    = getVal(c[4].textContent); // Index 4: Blokir
+    const realisasi = getVal(c[6].textContent); // Index 6: Realisasi
 
-    const total = realisasi;
+    // 2. LOGIKA BARU: Sisa = Pagu - Blokir - Realisasi
     const sisa = pagu - realisasi;
 
-    cells[7].innerText = toRp(total);
-    cells[8].innerText = toRp(sisa);
-    cells[8].style.color = sisa < 0 ? "#ff0000" : "#000000";
-}
+    // 3. Render kembali ke tabel
+    c[7].textContent = toRp(realisasi); // Kolom Total = Realisasi
+    c[8].textContent = toRp(sisa);      // Kolom Sisa = Hasil hitung baru
 
+    // 4. Feedback visual jika sisa negatif (Over Budget)
+    if (sisa < 0) {
+        c[8].style.color = "#ff0000";
+        c[8].style.fontWeight = "bold";
+    } else {
+        c[8].style.color = "#000000";
+        c[8].style.fontWeight = "normal";
+    }
+}
+/**
+ * Mengupdate akumulasi nilai hirarki dari bawah ke atas.
+ * Optimasi: Menggunakan caching koleksi baris dan meminimalkan query DOM.
+ */
 function updateMondas() {
-    const rows = Array.from(tableBody.querySelectorAll('tr'));
-    
-    // Loop dari bawah ke atas agar nilai level terdalam (Lv 4) 
-    // terakumulasi ke Lv 3, lalu Lv 3 ke Lv 2, dst.
-    for (let i = rows.length - 1; i >= 0; i--) {
+    const rows = Array.from(tableBody.rows);
+    const rowCount = rows.length;
+    if (rowCount === 0) return;
+
+    // Loop Bottom-Up: Penting agar nilai anak naik ke cucu, lalu ke induk
+    for (let i = rowCount - 1; i >= 0; i--) {
         const row = rows[i];
         const level = parseInt(row.getAttribute('data-level')) || 0;
-        const cells = row.querySelectorAll('td');
+        const cells = row.cells; 
 
-        // Cek apakah baris ini punya anak (baris di bawahnya level-nya lebih tinggi)
-        let hasChild = (i + 1 < rows.length && parseInt(rows[i+1].getAttribute('data-level')) > level);
+        // Optimasi: Cek apakah baris ini memiliki anak
+        const nextRow = rows[i + 1];
+        const hasChild = (nextRow && (parseInt(nextRow.getAttribute('data-level')) || 0) > level);
 
         if (hasChild) {
-            let sumPagu = 0, sumBlokir = 0, sumRPD = 0, sumReal = 0;
+            let sums = { pagu: 0, blokir: 0, rpd: 0, real: 0 };
             let monthlyRPD = new Array(12).fill(0);
             let monthlyReal = new Array(12).fill(0);
 
-            for (let j = i + 1; j < rows.length; j++) {
+            // Scan anak-anak langsung (Level + 1)
+            for (let j = i + 1; j < rowCount; j++) {
                 const child = rows[j];
-                const childLv = parseInt(child.getAttribute('data-level'));
-                
-                // Berhenti jika ketemu baris yang levelnya sama atau lebih kecil (bukan anak lagi)
-                if (childLv <= level) break;
-                
-                // --- PERBAIKAN DI SINI ---
-                // Hanya jumlahkan baris yang levelnya tepat 1 tingkat di bawah induk (anak langsung)
-                // Ini mencegah "double counting" karena anak langsung sudah membawa nilai cucu-cucunya.
-                if (childLv === level + 1) {
-                    const c = child.querySelectorAll('td');
-                    sumPagu += getVal(c[3].innerText);
-                    sumBlokir += getVal(c[4].innerText);
-                    sumRPD += getVal(c[5].innerText);
-                    sumReal += getVal(c[6].innerText);
+                const childLv = parseInt(child.getAttribute('data-level')) || 0;
 
-                    const cRPDData = (child.dataset.rpdBulanan || "0|0|0|0|0|0|0|0|0|0|0|0").split('|');
-                    const cRealData = (child.dataset.realisasiBulanan || "0|0|0|0|0|0|0|0|0|0|0|0").split('|');
+                if (childLv <= level) break; // Keluar dari grup jika level kembali setara/kecil
+
+                if (childLv === level + 1) {
+                    const c = child.cells;
+                    
+                    // Akumulasi Total
+                    sums.pagu   += getVal(c[3].textContent);
+                    sums.blokir += getVal(c[4].textContent);
+                    sums.rpd    += getVal(c[5].textContent);
+                    sums.real   += getVal(c[6].textContent);
+
+                    // Akumulasi Bulanan (Dataset)
+                    const cRPDArr = (child.dataset.rpdBulanan || "").split('|');
+                    const cRealArr = (child.dataset.realisasiBulanan || "").split('|');
 
                     for (let m = 0; m < 12; m++) {
-                        monthlyRPD[m] += getVal(cRPDData[m]);
-                        monthlyReal[m] += getVal(cRealData[m]);
+                        monthlyRPD[m] += Number(cRPDArr[m]) || 0;
+                        monthlyReal[m] += Number(cRealArr[m]) || 0;
                     }
                 }
             }
-            
-            // Masukkan hasil jumlah ke sel induk
-            cells[3].innerText = toRp(sumPagu);
-            cells[4].innerText = toRp(sumBlokir);
-            cells[5].innerText = toRp(sumRPD);
-            cells[6].innerText = toRp(sumReal);
 
+            // Update UI Induk
+            cells[3].textContent = toRp(sums.pagu);
+            cells[4].textContent = toRp(sums.blokir);
+            cells[5].textContent = toRp(sums.rpd);
+            cells[6].textContent = toRp(sums.real);
+
+            // Simpan hasil akumulasi ke dataset induk
             row.dataset.rpdBulanan = monthlyRPD.join('|');
             row.dataset.realisasiBulanan = monthlyReal.join('|');
             row.classList.add('is-parent');
         } else {
-            // Jika level 4 atau baris terbawah yang tidak punya anak
             row.classList.remove('is-parent');
         }
-        
+
+        // Jalankan kalkulasi sisa/total (Pagu - Realisasi)
         calculateRowTotal(row);
     }
-    updateDashboardTotal();
+
+    // Update Dashboard Monitor
+    if (typeof updateDashboardTotal === 'function') {
+        updateDashboardTotal();
+    }
 }
 
 // =====================================================================
@@ -273,157 +295,129 @@ document.getElementById('btnEdit').addEventListener('click', function() {
 
 document.getElementById('btnUpdateData').onclick = function() {
     if (currentRowForEdit) {
-        const cells = currentRowForEdit.querySelectorAll('td');
+        // 1. Gunakan .cells (lebih cepat daripada querySelectorAll)
+        const c = currentRowForEdit.cells;
         const level = parseInt(currentRowForEdit.getAttribute('data-level')) || 0;
         const symbol = level > 0 ? '' : '';
 
-        cells[1].innerHTML = `<div style="display:flex;align-items:center;"><span style="color:#808080;margin-right:5px">${symbol}</span><span>${document.getElementById('editKode').value}</span></div>`;
-        cells[2].innerText = document.getElementById('editNama').value;
+        // 2. Update Kode (Gunakan innerHTML karena ada struktur div/span)
+        const kodeVal = document.getElementById('editKode').value;
+        c[1].innerHTML = `
+            <div style="display:flex; align-items:center;">
+                <span style="color:#808080; margin-right:5px">${symbol}</span>
+                <span>${kodeVal}</span>
+            </div>`;
+
+        // 3. Update Nama (Gunakan textContent untuk keamanan)
+        c[2].textContent = document.getElementById('editNama').value;
         
+        // 4. Update Nilai (Hanya jika Level 4 / Bukan Induk)
         if (level === 4) {
-            cells[3].innerText = document.getElementById('editPagu').value;
-            cells[4].innerText = document.getElementById('editBlokir').value;
+            // Pastikan nilai yang masuk ke tabel tetap terformat (misal: 1.000.000)
+            // agar getVal() nanti bisa memprosesnya dengan benar
+            c[3].textContent = document.getElementById('editPagu').value || "0";
+            c[4].textContent = document.getElementById('editBlokir').value || "0";
         }
 
+        // 5. Finalisasi
         closeAllModals();
+        
+        // PENTING: Jalankan updateMondas agar perubahan di Level 4 
+        // langsung naik ke induk Level 3, 2, 1, dan 0
         updateMondas();
+        
+        // Opsional: Tandai data telah berubah (jika menggunakan fitur dirty state)
+        if (typeof markDirty === 'function') markDirty();
     }
 };
 
 // --- B. MODAL RPD ---
-// --- B. MODAL RPD (RENCANA PENARIKAN DANA) ---
-// --- B. MODAL RPD (RENCANA PENARIKAN DANA) ---
-
-// Pastikan variabel ini ada di lingkup global/atas
-// let targetRowRPD = null; 
-
 document.getElementById('btnRPD').addEventListener('click', () => {
     const selected = tableBody.querySelector('.row-checkbox:checked');
     if (!selected) return alert("Pilih baris!");
     
     targetRowRPD = selected.closest('tr');
 
-    // --- LOGIKA BARU: CEK STATUS INDUK ---
     const isParent = targetRowRPD.classList.contains('is-parent');
     const btnSimpan = document.getElementById('btnUpdateRPD');
-    const cells = targetRowRPD.querySelectorAll('td');
+    const c = targetRowRPD.cells; 
     const inputs = rpdModal.querySelectorAll('.input-bulan');
     
-    // 1. Ambil nilai Pagu dan Blokir dari tabel
-    const valPagu = getVal(cells[3].innerText);
-    const valBlokir = getVal(cells[4].innerText);
-    const valNeto = valPagu - valBlokir;
+    // 1. Ambil nilai Pagu murni (Tanpa dikurangi blokir)
+    // Sesuai instruksi: RPD menyesuaikan nilai Pagu murni (Kolom index 3)
+    const valPaguMurni = getVal(c[3].textContent);
 
-    // 2. Fungsi untuk Update Tampilan Info Bar
+    // 2. Fungsi Internal untuk Update Tampilan Info Bar & Total Input
     const updateRPDInfoBar = () => {
         let totalRPD = 0;
         inputs.forEach(i => totalRPD += getVal(i.value));
         
-        const sisa = valNeto - totalRPD;
+        // Sisa dihitung dari Pagu Murni - Total RPD yang diinput
+        const sisa = valPaguMurni - totalRPD;
         const infoSpans = document.querySelectorAll('#infoBarRPD span');
         
         if (infoSpans.length >= 3) {
-            infoSpans[0].innerText = `PAGU: ${toRp(valNeto)}`; 
-            infoSpans[1].innerText = `RPD: ${toRp(totalRPD)}`;
-            infoSpans[2].innerText = `SISA: ${toRp(sisa)}`;
+            infoSpans[0].textContent = `PAGU: ${toRp(valPaguMurni)}`; 
+            infoSpans[1].textContent = `RPD: ${toRp(totalRPD)}`;
+            infoSpans[2].textContent = `SISA: ${toRp(sisa)}`; // Menggunakan istilah Selisih/Sisa RPD
             infoSpans[2].style.color = sisa < 0 ? "#ff4d4d" : "#ffffff";
+            infoSpans[2].style.fontWeight = sisa < 0 ? "bold" : "normal";
         }
         
         const totalInput = document.getElementById('totalRPDInput');
         if (totalInput) totalInput.value = toRp(totalRPD);
     };
 
-    // 3. Load data & Proteksi Input
-   const savedData = (targetRowRPD.dataset.rpdBulanan || "0|0|0|0|0|0|0|0|0|0|0|0").split('|');
+    // 3. Load data & Pasang Event Listener ke Input
+    const savedData = (targetRowRPD.dataset.rpdBulanan || "0|0|0|0|0|0|0|0|0|0|0|0").split('|');
+    
     inputs.forEach((inp, idx) => {
-        // Gunakan formatRibuan saat memasukkan nilai dari dataset ke input
         let valMurni = savedData[idx] || "0";
-        inp.value = valMurni === "0" ? "" : formatRibuan(valMurni);
+        inp.value = (valMurni === "0" || valMurni === "") ? "" : formatRibuan(valMurni);
         
+        // Proteksi Input (Readonly jika baris induk)
         inp.readOnly = isParent;
-    inp.style.backgroundColor = isParent ? "#222" : "#fff"; // Sesuaikan tema gelap/terang
-    inp.style.cursor = isParent ? "not-allowed" : "text";
+        inp.style.backgroundColor = isParent ? "#2d2d2d" : "#ffffff"; 
+        inp.style.cursor = isParent ? "not-allowed" : "text";
 
-    inp.oninput = function() {
-        this.value = formatRibuan(this.value);
-        
-        // 1. Update info bar di dalam modal (Pagu & Sisa RPD)
-        updateRPDInfoBar(); 
-        
-        // 2. Simpan sementara ke dataset baris RPD (Bukan Realisasi)
-        const currentValues = Array.from(inputs).map(i => i.value || "0").join('|');
-        targetRowRPD.dataset.rpdBulanan = currentValues;
-        
-        // 3. Masukkan total bulanan ke kolom RPD di tabel (Index 5)
-        let totalBaru = Array.from(inputs).reduce((acc, curr) => acc + getVal(curr.value), 0);
-        targetRowRPD.querySelectorAll('td')[5].innerText = toRp(totalBaru);
-        
-        // --- KUNCI REALTIME ---
-        // 4. Update Hirarki (Agar Level 0 ikut berubah saat mengetik)
-        updateMondas(); 
-        
-        // 5. Update Con1 (Monitor Screen)
-        updateDashboardTotal(); 
-    };
-});
-    // 4. KONTROL TOMBOL SIMPAN
-    // Sembunyikan tombol simpan jika baris adalah induk
+        // Logic Input Real-time
+        inp.oninput = function() {
+            // A. Feedback Visual Langsung
+            this.value = formatRibuan(this.value);
+            updateRPDInfoBar(); 
+
+            if (isParent) return;
+
+            // B. Debounce: Update Tabel Utama & Hirarki
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+                // 1. Simpan angka murni ke dataset
+                const murniArr = Array.from(inputs).map(i => i.value.replace(/\D/g, "") || "0");
+                targetRowRPD.dataset.rpdBulanan = murniArr.join('|');
+                
+                // 2. Update kolom RPD di tabel (Kolom index 5)
+                const totalBaru = murniArr.reduce((acc, curr) => acc + parseInt(curr), 0);
+                c[5].textContent = toRp(totalBaru);
+                
+                // 3. Jalankan Rekalkulasi Hirarki (Update level di atasnya & Sisa Anggaran)
+                updateMondas(); 
+            }, 500);
+        };
+    });
+
+    // 4. Kontrol Tombol Simpan
     if (btnSimpan) {
         btnSimpan.style.display = isParent ? "none" : "block";
+        btnSimpan.onclick = () => {
+            closeAllModals();
+            updateMondas();
+        };
     }
 
-    // 5. Jalankan update pertama kali & tampilkan modal
+    // 5. Inisialisasi tampilan awal modal
     updateRPDInfoBar();
     rpdModal.style.display = 'flex';
 });
-
-// LOGIKA TOMBOL SIMPAN RPD
-document.getElementById('btnUpdateRPD').onclick = function() {
-    if (targetRowRPD) {
-        // 1. Ambil semua input bulan di modal RPD
-        const inputs = rpdModal.querySelectorAll('.input-bulan');
-        
-        let bulanValues = [];
-
-        // 2. Loop tepat 12 bulan (Jan-Des)
-        for (let i = 0; i < 12; i++) {
-            if (inputs[i]) {
-                // Ambil nilai dari kotak (misal: "1.500.000")
-                // Bersihkan SEMUA karakter non-angka agar jadi murni (misal: "1500000")
-                let valMurni = inputs[i].value.replace(/\D/g, "") || "0";
-                
-                // Masukkan ke array untuk disimpan
-                bulanValues.push(valMurni);
-                
-                // OPSIONAL: Pastikan tampilan di kotak tetap terformat titik 
-                // jika user lupa mengetik dengan benar
-                if (valMurni !== "0") {
-                    inputs[i].value = new Intl.NumberFormat('id-ID').format(valMurni);
-                }
-            } else {
-                bulanValues.push("0");
-            }
-        }
-
-        // 3. Simpan ke dataset sebagai string angka murni (misal: 1000000|2000000|...)
-        targetRowRPD.dataset.rpdBulanan = bulanValues.join('|');
-        
-        // 4. Ambil Total RPD dari input total (yang biasanya sudah ada titiknya)
-        const totalRPDStr = document.getElementById('totalRPDInput').value;
-        
-        // 5. Update tampilan kolom RPD di tabel utama (Index kolom ke-5)
-        const cells = targetRowRPD.querySelectorAll('td');
-        if (cells[5]) {
-            cells[5].innerText = totalRPDStr; 
-        }
-        
-        closeAllModals();
-        updateMondas(); // Rekalkulasi ke baris Induk
-        
-        console.log("Data Berhasil Disimpan (Angka Murni):", targetRowRPD.dataset.rpdBulanan);
-    }
-};
-
 // --- C. MODAL REALISASI ---
 document.getElementById('btnRealisasi').addEventListener('click', () => {
     const selected = tableBody.querySelector('.row-checkbox:checked');
@@ -431,20 +425,19 @@ document.getElementById('btnRealisasi').addEventListener('click', () => {
     
     targetRowRealisasi = selected.closest('tr');
 
-    // --- LOGIKA STATUS INDUK ---
     const isParent = targetRowRealisasi.classList.contains('is-parent');
     const btnSimpan = document.getElementById('btnUpdateRealisasi');
-    const cells = targetRowRealisasi.querySelectorAll('td');
+    const c = targetRowRealisasi.cells; // Menggunakan properti .cells (Performa Tinggi)
     const inputs = realisasiModal.querySelectorAll('.input-realisasi');
     
-    // 1. AMBIL NILAI RPD SEBAGAI ACUAN (PAGU)
-    const valRPD = getVal(cells[5].innerText);
+    // 1. Ambil nilai RPD sebagai acuan plafon realisasi (Kolom index 5)
+    const valRPD = getVal(c[5].textContent);
 
-    // 2. AMBIL DATA UNTUK PLACEHOLDER & LOAD
+    // 2. Load Data Dataset
     const dataRPD = (targetRowRealisasi.dataset.rpdBulanan || "0|0|0|0|0|0|0|0|0|0|0|0").split('|');
     const savedReal = (targetRowRealisasi.dataset.realisasiBulanan || "0|0|0|0|0|0|0|0|0|0|0|0").split('|');
 
-    // 3. FUNGSI UPDATE INFO BAR (Didefinisikan di dalam agar bisa diakses oninput)
+    // 3. Fungsi Update Info Bar Modal
     const updateRealInfoBar = () => {
         let totalReal = 0;
         inputs.forEach(i => totalReal += getVal(i.value));
@@ -453,115 +446,127 @@ document.getElementById('btnRealisasi').addEventListener('click', () => {
         const infoSpans = document.querySelectorAll('#infoBarRealisasi span');
         
         if (infoSpans.length >= 3) {
-            infoSpans[0].innerText = `RPD: ${toRp(valRPD)}`; 
-            infoSpans[1].innerText = `REALISASI: ${toRp(totalReal)}`;
-            infoSpans[2].innerText = `SISA: ${toRp(sisa)}`;
+            infoSpans[0].textContent = `RPD: ${toRp(valRPD)}`; 
+            infoSpans[1].textContent = `REALISASI: ${toRp(totalReal)}`;
+            infoSpans[2].textContent = `SISA: ${toRp(sisa)}`;
             infoSpans[2].style.color = sisa < 0 ? "#ff4d4d" : "#ffffff";
+            infoSpans[2].style.fontWeight = sisa < 0 ? "bold" : "normal";
         }
         
         const totalInput = document.getElementById('totalRealisasiInput');
         if (totalInput) totalInput.value = toRp(totalReal);
     };
 
-    // 4. PENGISIAN DATA & EVENT LISTENER (Hanya Satu Kali Loop)
+    // 4. Inisialisasi Input & Event Listener
     inputs.forEach((inp, idx) => {
-        // Set Placeholder (Format Ribuan)
+        // Placeholder dari RPD bulan tersebut
         let valPlaceholder = dataRPD[idx] || "0";
         inp.placeholder = valPlaceholder !== "0" ? formatRibuan(valPlaceholder) : "0";
         
-        // Set Value Awal (Format Ribuan agar titik muncul saat dibuka)
+        // Nilai awal dari dataset Realisasi
         let valAwal = savedReal[idx] || "0";
-        inp.value = (valAwal !== "0") ? formatRibuan(valAwal) : "";
+        inp.value = (valAwal !== "0" && valAwal !== "") ? formatRibuan(valAwal) : "";
         
-        // Proteksi Input
+        // Proteksi jika baris induk
         inp.readOnly = isParent;
         inp.style.backgroundColor = isParent ? "#f0f0f0" : "#ffffff";
         inp.style.cursor = isParent ? "not-allowed" : "text";
 
-        // Event saat mengetik
+        // Logic Input Real-time (Debounce)
         inp.oninput = function() {
-            // A. Munculkan titik otomatis saat mengetik
+            // Feedback instan di modal
             this.value = formatRibuan(this.value);
-            
-            // B. Update Info Bar di modal
             updateRealInfoBar(); 
-            
-            // C. Simpan angka murni ke dataset (REALTIME)
-            const currentValues = Array.from(inputs).map(i => i.value.replace(/\D/g, "") || "0").join('|');
-            targetRowRealisasi.dataset.realisasiBulanan = currentValues;
-            
-            // D. Update kolom Realisasi di Tabel Utama (Index 6)
-            let totalBaru = Array.from(inputs).reduce((acc, curr) => acc + getVal(curr.value), 0);
-            targetRowRealisasi.querySelectorAll('td')[6].innerText = toRp(totalBaru);
-            
-            // E. Jalankan Update Hirarki & Dashboard
-            updateMondas(); 
-            updateDashboardTotal(); 
+
+            if (isParent) return;
+
+            // Debounce untuk kalkulasi berat di tabel utama
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+                // A. Simpan angka murni ke dataset
+                const murniArr = Array.from(inputs).map(i => i.value.replace(/\D/g, "") || "0");
+                targetRowRealisasi.dataset.realisasiBulanan = murniArr.join('|');
+                
+                // B. Update kolom Realisasi di tabel (Kolom index 6)
+                const totalBaru = murniArr.reduce((acc, curr) => acc + parseInt(curr), 0);
+                c[6].textContent = toRp(totalBaru);
+                
+                // C. Jalankan Update Hirarki & Dashboard
+                updateMondas(); 
+            }, 500);
         };
     });
 
-    // 5. KONTROL TOMBOL SIMPAN
+    // 5. Kontrol Tombol Simpan
     if (btnSimpan) {
         btnSimpan.style.display = isParent ? "none" : "block";
+        btnSimpan.onclick = function() {
+            // Karena sudah tersimpan via oninput, cukup tutup modal
+            closeAllModals();
+            updateMondas(); // Pastikan sinkronisasi final
+        };
     }
 
-    // 6. Jalankan update info & tampilkan modal
+    // Tampilkan modal
     updateRealInfoBar();
     realisasiModal.style.display = 'flex';
 });
-
-// --- TOMBOL UPDATE/SIMPAN FINAL ---
-document.getElementById('btnUpdateRealisasi').onclick = function() {
-    if (targetRowRealisasi) {
-        // Karena oninput sudah menyimpan ke dataset secara realtime, 
-        // kita hanya perlu memastikan tampilan tabel utama sudah benar.
-        const totalFinal = document.getElementById('totalRealisasiInput').value;
-        targetRowRealisasi.querySelectorAll('td')[6].innerText = totalFinal;
-
-        closeAllModals();
-        updateMondas();
-    }
-};// =====================================================================
+// =====================================================================
 // 6. PENYIMPANAN & INITIALIZATION
 // =====================================================================
-
 document.getElementById('btnSave').addEventListener('click', async () => {
     const btn = document.getElementById('btnSave');
+    const originalText = btn.innerText;
+    
+    // 1. UI Feedback & Validasi
     btn.innerText = "SAVING...";
     btn.disabled = true;
 
-    // 1. Ambil semua data dari baris tabel
-    const rows = Array.from(tableBody.querySelectorAll('tr')).map((row, index) => {
-        const cells = row.querySelectorAll('td');
-        return {
-            sort_order: index, // Penting agar urutan baris tidak berantakan
-            level: parseInt(row.getAttribute('data-level')),
-            rpd_bulanan: row.dataset.rpdBulanan,
-            real_bulanan: row.dataset.realisasiBulanan,
-            kode: cells[1].innerText.trim(),
-            nama: cells[2].innerText,
-            pagu: getVal(cells[3].innerText),
-            blokir: getVal(cells[4].innerText),
-            rpd_total: getVal(cells[5].innerText),
-            real_total: getVal(cells[6].innerText)
-        };
-    });
-
     try {
-        // 2. Hapus data lama di Supabase (Overwriting)
-        // Note: Untuk aplikasi produksi, sebaiknya gunakan logic 'upsert'
-        await _supabase.from('anggaran').delete().neq('id', 0); 
+        // 2. Ekstraksi Data (Sangat Efisien)
+        const rowsToSave = Array.from(tableBody.rows).map((row, index) => {
+            const c = row.cells;
+            return {
+                sort_order: index,
+                level: parseInt(row.getAttribute('data-level')) || 0,
+                rpd_bulanan: row.dataset.rpdBulanan || "0|0|0|0|0|0|0|0|0|0|0|0",
+                real_bulanan: row.dataset.realisasiBulanan || "0|0|0|0|0|0|0|0|0|0|0|0",
+                kode: c[1].textContent.trim(),
+                nama: c[2].textContent.trim(),
+                pagu: getVal(c[3].textContent),
+                blokir: getVal(c[4].textContent),
+                rpd_total: getVal(c[5].textContent),
+                real_total: getVal(c[6].textContent)
+            };
+        });
 
-        // 3. Masukkan data baru
-        const { error } = await _supabase.from('anggaran').insert(rows);
-        
-        if (error) throw error;
-        alert("Data Berhasil Disinkronkan ke Cloud.");
+        if (rowsToSave.length === 0) throw new Error("Tidak ada data untuk disimpan.");
+
+        // 3. Eksekusi Supabase
+        // Strategi: Hapus semua data berdasarkan range sort_order agar lebih universal
+        const { error: deleteError } = await _supabase
+            .from('anggaran')
+            .delete()
+            .gt('sort_order', -1); // Menghapus semua yang indexnya >= 0
+
+        if (deleteError) throw deleteError;
+
+        // Insert Bulk (Supabase otomatis menangani batching jika data besar)
+        const { error: insertError } = await _supabase
+            .from('anggaran')
+            .insert(rowsToSave);
+
+        if (insertError) throw insertError;
+
+        // 4. Sukses
+        alert("✅ Data Berhasil Disinkronkan ke Cloud.");
+
     } catch (err) {
-        console.error(err);
-        alert("Gagal menyimpan ke Cloud: " + err.message);
+        console.error("Save Error:", err);
+        alert(`❌ Gagal menyimpan: ${err.message || "Terjadi kesalahan koneksi"}`);
     } finally {
-        btn.innerText = "SAVE";
+        // 5. Kembalikan State UI
+        btn.innerText = originalText;
         btn.disabled = false;
     }
 });
@@ -704,45 +709,51 @@ checkAllMaster.addEventListener('change', function() {
 });
 // =========== TOTAL DAS1 ===============
 function updateDashboardTotal() {
-    let totalPagu = 0;
-    let totalBlokir = 0;
-    let totalRPD = 0;
-    let totalRealisasi = 0;
+    // 1. Gunakan selektor spesifik untuk hanya mengambil baris Level 0
+    // Ini jauh lebih cepat daripada meloop SEMUA baris
+    const topLevelRows = tableBody.querySelectorAll('tr[data-level="0"]');
+    
+    let totals = { pagu: 0, blokir: 0, rpd: 0, real: 0 };
 
-    // Ambil semua baris di tabel
-    const rows = tableBody.querySelectorAll('tr');
-
-    rows.forEach(row => {
-        // Hanya ambil data dari baris Level 0 (Grand Total)
-        if (row.getAttribute('data-level') === "0") {
-            const cells = row.querySelectorAll('td');
-            
-            // Kolom: Pagu(3), Blokir(4), RPD(5), Realisasi(6)
-            if (cells.length > 6) {
-                totalPagu += getVal(cells[3].innerText);
-                totalBlokir += getVal(cells[4].innerText);
-                totalRPD += getVal(cells[5].innerText);
-                totalRealisasi += getVal(cells[6].innerText);
-            }
+    // 2. Kalkulasi Batch
+    topLevelRows.forEach(row => {
+        const c = row.cells; // Menggunakan .cells jauh lebih cepat dari querySelectorAll('td')
+        
+        if (c.length > 6) {
+            totals.pagu   += getVal(c[3].textContent);
+            totals.blokir += getVal(c[4].textContent);
+            totals.rpd    += getVal(c[5].textContent);
+            totals.real   += getVal(c[6].textContent);
         }
     });
 
-    // Render ke elemen Monitor Screen (Con1)
-    const dPagu = document.getElementById('statTotalPagu');
-    const dBlokir = document.getElementById('statTotalBlokir');
-    const dRPD = document.getElementById('statTotalRPD');
-    const dReal = document.getElementById('statTotalRealisasi');
+    // 3. Render Batch (Cek elemen sekaligus)
+    // Gunakan textContent untuk performa render yang lebih ringan
+    const elements = {
+        'statTotalPagu': totals.pagu,
+        'statTotalBlokir': totals.blokir,
+        'statTotalRPD': totals.rpd,
+        'statTotalRealisasi': totals.real
+    };
 
-    if (dPagu) dPagu.innerText = toRp(totalPagu);
-    if (dBlokir) dBlokir.innerText = toRp(totalBlokir);
-    if (dRPD) dRPD.innerText = toRp(totalRPD);
-    if (dReal) dReal.innerText = toRp(totalRealisasi);
+    for (const [id, value] of Object.entries(elements)) {
+        const el = document.getElementById(id);
+        if (el) {
+            const formatted = toRp(value);
+            // Hanya update DOM jika nilainya berubah (mencegah flickering)
+            if (el.textContent !== formatted) {
+                el.textContent = formatted;
+            }
+        }
+    }
 }
 
-// Inisialisasi saat halaman siap
+// Inisialisasi yang lebih bersih
 document.addEventListener('DOMContentLoaded', () => {
-    // Muat dari Cloud, bukan localStorage
-    loadDataFromSupabase();
+    // Jalankan fungsi load data
+    if (typeof loadDataFromSupabase === 'function') {
+        loadDataFromSupabase();
+    }
 });
 
 // ==================== EXPORT & IMPORT ==========================
@@ -995,4 +1006,15 @@ tableBody.addEventListener('click', function(e) {
         cb.dispatchEvent(new Event('change', { bubbles: true }));
     }
 });
+window.addEventListener('beforeunload', (e) => {
+    if (isDirty) {
+        e.preventDefault();
+        e.returnValue = 'Anda memiliki perubahan yang belum disimpan. Yakin ingin keluar?';
+    }
+});
+
+// Reset status dirty saat berhasil save
+// (Tambahkan ini di dalam blok 'try' pada fungsi btnSave setelah alert sukses)
+isDirty = false;
+btn.style.backgroundColor = ""; // Reset warna tombol
 
