@@ -250,7 +250,7 @@ tr[data-level="0"] {
 }
 
 .modal-header {
-    background: #000080;
+    background: #008080;
     color: white;
     padding: 4px 8px;
     display: flex;
@@ -398,7 +398,7 @@ tr[data-level="0"] {
     grid-column: span 2; /* Full width di bawah dua kolom */
     display: flex;
     justify-content: space-between;
-    background: #000080; /* Biru Windows Klasik */
+    background: #008080; /* Biru Windows Klasik */
     color: white;
     padding: 8px 12px;
     margin-top: 15px;
@@ -442,7 +442,7 @@ tr[data-level="0"] {
 
 /* Baris Judul Biru */
 .title-bar {
-    background: #000080; /* Biru Windows Klasik */
+    background: #008080; /* Biru Windows Klasik */
     color: white;
     padding: 2px 4px;
     height: 22px;
@@ -545,4 +545,51 @@ tr.row-selected:hover {
 /* Pastikan checkbox yang aktif terlihat jelas */
 .row-checkbox:checked {
     accent-color: #fbc02d; /* Warna kuning emas untuk kotak centangnya */
+}
+
+/* Container Pencarian di Ujung Kanan */
+.search-container-classic {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 2px 5px;
+}
+
+/* Label Bergaya Retro */
+.search-container-classic label {
+    font-family: "MS Sans Serif", Tahoma, sans-serif;
+    font-size: 11px;
+    font-weight: bold;
+    color: #000;
+    text-transform: uppercase;
+}
+
+/* Input Field dengan Efek Inset (Cekung) */
+.input-classic {
+    background-color: #ffffff;
+    border-top: 2px solid #808080;
+    border-left: 2px solid #808080;
+    border-bottom: 2px solid #ffffff;
+    border-right: 2px solid #ffffff;
+    padding: 4px 8px;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 13px;
+    color: #000;
+    width: 180px;
+    outline: none;
+}
+
+/* Efek saat Input diklik (Focus) */
+.input-classic:focus {
+    border-top: 2px solid #000080; /* Warna biru tua klasik saat aktif */
+    border-left: 2px solid #000080;
+    background-color: #ffffca; /* Kuning pucat ala kertas lama */
+}
+
+/* Placeholder warna abu-abu tua */
+.input-classic::placeholder {
+    color: #808080;
+    font-style: italic;
+    font-size: 11px;
 }
