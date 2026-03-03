@@ -267,9 +267,17 @@ document.querySelectorAll('.btn-close, .btn-batal, #btnCancelEdit, #btnCancelRPD
 
 // --- A. MODAL EDIT DATA ---
 document.getElementById('btnEdit').addEventListener('click', function() {
-    const selected = tableBody.querySelector('.row-checkbox:checked');
-    if (!selected) return alert("Pilih baris!");
+    // KODE BARU (Cek jumlah yang dicentang)
+    const selectedCbs = tableBody.querySelectorAll('.row-checkbox:checked');
 
+    if (selectedCbs.length === 0) {
+        return alert("Pilih satu baris!");
+    }
+    if (selectedCbs.length > 1) {
+        return alert("Gagal: Anda memilih " + selectedCbs.length + " baris. Silakan pilih satu baris saja untuk fitur ini.");
+    }
+    // Jika lolos validasi, definisikan 'selected' untuk dipakai kode di bawahnya
+    const selected = selectedCbs[0];
     currentRowForEdit = selected.closest('tr');
     const cells = currentRowForEdit.querySelectorAll('td');
     const level = parseInt(currentRowForEdit.getAttribute('data-level')) || 0;
@@ -331,35 +339,46 @@ document.getElementById('btnUpdateData').onclick = function() {
     }
 };
 
-// --- B. MODAL RPD ---
+// --- B. MODAL RPD (FIXED VALIDASI SINGLE SELECT) ---
 document.getElementById('btnRPD').addEventListener('click', () => {
-    const selected = tableBody.querySelector('.row-checkbox:checked');
-    if (!selected) return alert("Pilih baris!");
+    // 1. Ambil SEMUA checkbox yang dicentang
+    const selectedCbs = tableBody.querySelectorAll('.row-checkbox:checked');
     
+    // 2. Validasi: Harus ada yang dipilih
+    if (selectedCbs.length === 0) {
+        return alert("Pilih satu baris untuk mengisi RPD!");
+    }
+    
+    // 3. Validasi: Tidak boleh lebih dari satu
+    if (selectedCbs.length > 1) {
+        return alert("Maaf, input RPD hanya bisa dilakukan satu per satu. Anda memilih " + selectedCbs.length + " baris.");
+    }
+
+    // 4. Jika lolos, ambil baris pertama (index 0)
+    const selected = selectedCbs[0];
+    targetRowRPD = selected.closest('tr');
+
+    // ... sisa kode RPD Anda ke bawah (isParent, valPaguMurni, dll) tetap sama ...
     targetRowRPD = selected.closest('tr');
 
     const isParent = targetRowRPD.classList.contains('is-parent');
     const btnSimpan = document.getElementById('btnUpdateRPD');
     const c = targetRowRPD.cells; 
     const inputs = rpdModal.querySelectorAll('.input-bulan');
-    
-    // 1. Ambil nilai Pagu murni (Tanpa dikurangi blokir)
-    // Sesuai instruksi: RPD menyesuaikan nilai Pagu murni (Kolom index 3)
     const valPaguMurni = getVal(c[3].textContent);
 
-    // 2. Fungsi Internal untuk Update Tampilan Info Bar & Total Input
+    // 1. Fungsi Update Info Bar (Hanya merubah tampilan modal, bukan tabel utama)
     const updateRPDInfoBar = () => {
         let totalRPD = 0;
         inputs.forEach(i => totalRPD += getVal(i.value));
         
-        // Sisa dihitung dari Pagu Murni - Total RPD yang diinput
         const sisa = valPaguMurni - totalRPD;
         const infoSpans = document.querySelectorAll('#infoBarRPD span');
         
         if (infoSpans.length >= 3) {
             infoSpans[0].textContent = `PAGU: ${toRp(valPaguMurni)}`; 
             infoSpans[1].textContent = `RPD: ${toRp(totalRPD)}`;
-            infoSpans[2].textContent = `SISA: ${toRp(sisa)}`; // Menggunakan istilah Selisih/Sisa RPD
+            infoSpans[2].textContent = `SISA: ${toRp(sisa)}`;
             infoSpans[2].style.color = sisa < 0 ? "#ff4d4d" : "#ffffff";
             infoSpans[2].style.fontWeight = sisa < 0 ? "bold" : "normal";
         }
@@ -368,68 +387,69 @@ document.getElementById('btnRPD').addEventListener('click', () => {
         if (totalInput) totalInput.value = toRp(totalRPD);
     };
 
-    // 3. Load data & Pasang Event Listener ke Input
+    // 2. Load Data Awal ke Input Modal
     const savedData = (targetRowRPD.dataset.rpdBulanan || "0|0|0|0|0|0|0|0|0|0|0|0").split('|');
     
     inputs.forEach((inp, idx) => {
         let valMurni = savedData[idx] || "0";
         inp.value = (valMurni === "0" || valMurni === "") ? "" : formatRibuan(valMurni);
         
-        // Proteksi Input (Readonly jika baris induk)
         inp.readOnly = isParent;
         inp.style.backgroundColor = isParent ? "#2d2d2d" : "#ffffff"; 
         inp.style.cursor = isParent ? "not-allowed" : "text";
 
-        // Logic Input Real-time
+        // Logic Input: Hanya update visual modal
         inp.oninput = function() {
-            // A. Feedback Visual Langsung
             this.value = formatRibuan(this.value);
             updateRPDInfoBar(); 
-
-            if (isParent) return;
-
-            // B. Debounce: Update Tabel Utama & Hirarki
-            clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(() => {
-                // 1. Simpan angka murni ke dataset
-                const murniArr = Array.from(inputs).map(i => i.value.replace(/\D/g, "") || "0");
-                targetRowRPD.dataset.rpdBulanan = murniArr.join('|');
-                
-                // 2. Update kolom RPD di tabel (Kolom index 5)
-                const totalBaru = murniArr.reduce((acc, curr) => acc + parseInt(curr), 0);
-                c[5].textContent = toRp(totalBaru);
-                
-                // 3. Jalankan Rekalkulasi Hirarki (Update level di atasnya & Sisa Anggaran)
-                updateMondas(); 
-            }, 500);
+            // DEBOUNCE AUTO-SAVE DIHAPUS AGAR TIDAK TERUPDATE KE TABEL SEBELUM DISIMPAN
         };
     });
 
-    // 4. Kontrol Tombol Simpan
+    // 3. Kontrol Tombol Simpan (Proses Penulisan ke Tabel dilakukan di sini)
     if (btnSimpan) {
         btnSimpan.style.display = isParent ? "none" : "block";
+        
+        // Gunakan onclick eksplisit untuk memastikan data lama tidak terbawa
         btnSimpan.onclick = () => {
+            // A. Ambil data dari input modal
+            const murniArr = Array.from(inputs).map(i => i.value.replace(/\D/g, "") || "0");
+            const totalBaru = murniArr.reduce((acc, curr) => acc + parseInt(curr), 0);
+
+            // B. Simpan ke dataset baris tabel
+            targetRowRPD.dataset.rpdBulanan = murniArr.join('|');
+            
+            // C. Update tampilan kolom RPD di tabel utama (Index 5)
+            c[5].textContent = toRp(totalBaru);
+            
+            // D. Jalankan rekalkulasi hirarki
+            updateMondas(); 
+            updateDashboardTotal();
+            
             closeAllModals();
-            updateMondas();
         };
     }
 
-    // 5. Inisialisasi tampilan awal modal
+    // 4. Inisialisasi tampilan modal
     updateRPDInfoBar();
     rpdModal.style.display = 'flex';
 });
-// --- C. MODAL REALISASI ---
+// --- C. MODAL REALISASI (FIXED: NO AUTO-SAVE ON CANCEL) ---
 document.getElementById('btnRealisasi').addEventListener('click', () => {
-    const selected = tableBody.querySelector('.row-checkbox:checked');
-    if (!selected) return alert("Pilih baris!");
+  // Cek semua baris yang tercentang
+    const selectedCbs = tableBody.querySelectorAll('.row-checkbox:checked');
     
-    targetRowRealisasi = selected.closest('tr');
-
+    // Validasi: Harus ada dan hanya boleh satu
+    if (selectedCbs.length === 0) return alert("Pilih satu baris!");
+    if (selectedCbs.length > 1) return alert(`Pilih hanya satu baris (Anda memilih ${selectedCbs.length})`);
+    
+    // Jika valid, ambil baris tersebut
+    const targetRowRealisasi = selectedCbs[0].closest('tr');
+    
     const isParent = targetRowRealisasi.classList.contains('is-parent');
     const btnSimpan = document.getElementById('btnUpdateRealisasi');
-    const c = targetRowRealisasi.cells; // Menggunakan properti .cells (Performa Tinggi)
+    const c = targetRowRealisasi.cells; 
     const inputs = realisasiModal.querySelectorAll('.input-realisasi');
-    
     // 1. Ambil nilai RPD sebagai acuan plafon realisasi (Kolom index 5)
     const valRPD = getVal(c[5].textContent);
 
@@ -437,7 +457,7 @@ document.getElementById('btnRealisasi').addEventListener('click', () => {
     const dataRPD = (targetRowRealisasi.dataset.rpdBulanan || "0|0|0|0|0|0|0|0|0|0|0|0").split('|');
     const savedReal = (targetRowRealisasi.dataset.realisasiBulanan || "0|0|0|0|0|0|0|0|0|0|0|0").split('|');
 
-    // 3. Fungsi Update Info Bar Modal
+    // 3. Fungsi Update Info Bar Modal (Hanya Visual Modal)
     const updateRealInfoBar = () => {
         let totalReal = 0;
         inputs.forEach(i => totalReal += getVal(i.value));
@@ -472,38 +492,33 @@ document.getElementById('btnRealisasi').addEventListener('click', () => {
         inp.style.backgroundColor = isParent ? "#f0f0f0" : "#ffffff";
         inp.style.cursor = isParent ? "not-allowed" : "text";
 
-        // Logic Input Real-time (Debounce)
+        // Logic Input: Hanya update visual modal
         inp.oninput = function() {
-            // Feedback instan di modal
             this.value = formatRibuan(this.value);
             updateRealInfoBar(); 
-
-            if (isParent) return;
-
-            // Debounce untuk kalkulasi berat di tabel utama
-            clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(() => {
-                // A. Simpan angka murni ke dataset
-                const murniArr = Array.from(inputs).map(i => i.value.replace(/\D/g, "") || "0");
-                targetRowRealisasi.dataset.realisasiBulanan = murniArr.join('|');
-                
-                // B. Update kolom Realisasi di tabel (Kolom index 6)
-                const totalBaru = murniArr.reduce((acc, curr) => acc + parseInt(curr), 0);
-                c[6].textContent = toRp(totalBaru);
-                
-                // C. Jalankan Update Hirarki & Dashboard
-                updateMondas(); 
-            }, 500);
+            // AUTO-SAVE (DEBOUNCE) DIHAPUS AGAR DATA TIDAK MASUK SAAT CANCEL
         };
     });
 
-    // 5. Kontrol Tombol Simpan
+    // 5. Kontrol Tombol Simpan (Penyimpanan dilakukan HANYA di sini)
     if (btnSimpan) {
         btnSimpan.style.display = isParent ? "none" : "block";
         btnSimpan.onclick = function() {
-            // Karena sudah tersimpan via oninput, cukup tutup modal
+            // A. Ambil angka murni dari input modal
+            const murniArr = Array.from(inputs).map(i => i.value.replace(/\D/g, "") || "0");
+            const totalBaru = murniArr.reduce((acc, curr) => acc + parseInt(curr), 0);
+
+            // B. Simpan ke dataset baris tabel
+            targetRowRealisasi.dataset.realisasiBulanan = murniArr.join('|');
+            
+            // C. Update kolom Realisasi di tabel utama (Index 6)
+            c[6].textContent = toRp(totalBaru);
+            
+            // D. Jalankan Rekalkulasi Hirarki & Dashboard
+            updateMondas(); 
+            updateDashboardTotal();
+            
             closeAllModals();
-            updateMondas(); // Pastikan sinkronisasi final
         };
     }
 
@@ -682,7 +697,6 @@ checkAllMaster.addEventListener('change', function() {
     });
 });
 
-// Tambahan: Jika checklist baris diubah manual, sesuaikan checkbox master
 // Pasang listener di tableBody agar efisien (Event Delegation)
 tableBody.addEventListener('change', (e) => {
     if (e.target.classList.contains('row-checkbox')) {
@@ -709,16 +723,14 @@ checkAllMaster.addEventListener('change', function() {
 });
 // =========== TOTAL DAS1 ===============
 function updateDashboardTotal() {
-    // 1. Gunakan selektor spesifik untuk hanya mengambil baris Level 0
-    // Ini jauh lebih cepat daripada meloop SEMUA baris
+    // 1. Ambil baris Level 0 (Grand Total)
     const topLevelRows = tableBody.querySelectorAll('tr[data-level="0"]');
     
     let totals = { pagu: 0, blokir: 0, rpd: 0, real: 0 };
 
     // 2. Kalkulasi Batch
     topLevelRows.forEach(row => {
-        const c = row.cells; // Menggunakan .cells jauh lebih cepat dari querySelectorAll('td')
-        
+        const c = row.cells; 
         if (c.length > 6) {
             totals.pagu   += getVal(c[3].textContent);
             totals.blokir += getVal(c[4].textContent);
@@ -727,144 +739,75 @@ function updateDashboardTotal() {
         }
     });
 
-    // 3. Render Batch (Cek elemen sekaligus)
-    // Gunakan textContent untuk performa render yang lebih ringan
+    // --- HITUNG PERSENTASE (Tambahan agar tidak 0) ---
+    // Rumus: Realisasi / RPD * 100
+    const prsTotal = totals.rpd > 0 ? (totals.real / totals.rpd * 100) : 0;
+
+    // 3. Render Batch (Ditambah target dashPersen)
     const elements = {
-        'statTotalPagu': totals.pagu,
-        'statTotalBlokir': totals.blokir,
-        'statTotalRPD': totals.rpd,
-        'statTotalRealisasi': totals.real
+        'statTotalPagu': toRp(totals.pagu),
+        'statTotalBlokir': toRp(totals.blokir),
+        'statTotalRPD': toRp(totals.rpd),
+        'statTotalRealisasi': toRp(totals.real),
+        'dashPersen': prsTotal.toFixed(2) + "%" // Sesuai ID HTML Anda
     };
 
     for (const [id, value] of Object.entries(elements)) {
         const el = document.getElementById(id);
         if (el) {
-            const formatted = toRp(value);
-            // Hanya update DOM jika nilainya berubah (mencegah flickering)
-            if (el.textContent !== formatted) {
-                el.textContent = formatted;
+            // Hanya update DOM jika nilainya berubah
+            if (el.textContent !== value) {
+                el.textContent = value;
+
+                // Tambahan: Warna hijau neon untuk teks persentase
+                if (id === 'dashPersen') {
+                    el.style.color = (prsTotal > 0) ? "#0f0" : "#fff";
+                }
             }
         }
     }
 }
-
-// Inisialisasi yang lebih bersih
 document.addEventListener('DOMContentLoaded', () => {
-    // Jalankan fungsi load data
+    // 1. Inisialisasi Load Data
     if (typeof loadDataFromSupabase === 'function') {
         loadDataFromSupabase();
     }
-});
 
-// ==================== EXPORT & IMPORT ==========================
-// --- FUNGSI EXPORT (JSON) ---
-function handleExport() {
-    const tableRows = document.querySelectorAll('#tableBody tr');
-    
-    // 1. Ambil data dari tabel
-    const data = Array.from(tableRows).map(row => {
-        const cells = row.querySelectorAll('td');
-        return {
-            level: row.getAttribute('data-level'),
-            rpdBulanan: row.dataset.rpdBulanan || "",
-            realisasiBulanan: row.dataset.realisasiBulanan || "",
-            kode: cells[1].innerText.trim(),
-            uraian: cells[2].innerText,
-            pagu: cells[3].innerText,
-            blokir: cells[4].innerText,
-            rpd: cells[5].innerText,
-            realisasi: cells[6].innerText
-        };
-    });
+    // 2. Pencarian Ringan dengan Debounce
+    const searchInput = document.getElementById('tableSearch');
+    let searchTimer; // Variabel untuk menampung jeda waktu
 
-    if (data.length === 0) return alert("Tidak ada data untuk di-export!");
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            const filter = this.value.toUpperCase().trim();
+            
+            // Hapus timer sebelumnya (mencegah proses bertumpuk saat mengetik cepat)
+            clearTimeout(searchTimer);
 
-    try {
-        // 2. Ubah menjadi JSON String
-        const dataStr = JSON.stringify(data, null, 2);
-        
-        // 3. Gunakan Blob (Bukan Data URI)
-        const blob = new Blob([dataStr], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        
-        // 4. Proses Download
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `MONDAS_DATA_${new Date().getTime()}.json`;
-        
-        document.body.appendChild(link);
-        link.click();
-        
-        // 5. Bersihkan memori (Penting!)
-        setTimeout(() => {
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
-        }, 150);
-
-    } catch (error) {
-        console.error("Export Gagal:", error);
-        alert("Gagal mengekspor data. Ukuran data mungkin terlalu besar untuk aplikasi ini.");
-    }
-}
-// --- FUNGSI IMPORT (JSON) ---
-function handleImport(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        try {
-            const data = JSON.parse(e.target.result);
-            const tableBody = document.getElementById('tableBody');
-            tableBody.innerHTML = ''; // Bersihkan tabel sebelum import
-
-            data.forEach(item => {
-                const tr = document.createElement('tr');
-                tr.setAttribute('data-level', item.level);
-                if (item.isParent) tr.classList.add('is-parent');
+            // Jalankan pencarian HANYA setelah berhenti mengetik selama 300ms
+            searchTimer = setTimeout(() => {
+                const rows = document.querySelectorAll('#tableBody tr');
                 
-                // Kembalikan dataset bulanan
-                tr.dataset.rpdBulanan = item.rpdBulanan;
-                tr.dataset.realisasiBulanan = item.realisasiBulanan;
+                // Gunakan requestAnimationFrame agar render lebih smooth bagi browser
+                window.requestAnimationFrame(() => {
+                    rows.forEach(row => {
+                        const cellKode = row.cells[1] ? row.cells[1].innerText.toUpperCase() : "";
+                        const cellNama = row.cells[2] ? row.cells[2].innerText.toUpperCase() : "";
 
-                tr.innerHTML = `
-                    <td class="col-cb"><input type="checkbox" class="row-checkbox"></td>
-                    <td>${item.kode}</td>
-                    <td style="padding-left: ${item.level * 20}px">${item.uraian}</td>
-                    <td>${item.pagu}</td>
-                    <td>${item.blokir}</td>
-                    <td>${item.rpd}</td>
-                    <td>${item.realisasi}</td>
-                    <td>${item.sisa}</td>
-                    <td>${item.persen}</td>
-                `;
-                tableBody.appendChild(tr);
-            });
-
-            // Update Con1 (Dashboard) & Hirarki setelah data masuk
-            updateMondas();
-            updateDashboardTotal();
-            alert("Import Berhasil!");
-        } catch (err) {
-            alert("Gagal membaca file! Pastikan formatnya JSON yang benar.");
-        }
-    };
-    reader.readAsText(file);
-}
-
-// --- EVENT LISTENERS ---
-document.getElementById('btnExport').addEventListener('click', handleExport);
-
-document.getElementById('btnImport').addEventListener('click', () => {
-    // Membuat input file bayangan (hidden)
-    const hiddenInput = document.createElement('input');
-    hiddenInput.type = 'file';
-    hiddenInput.accept = '.json';
-    hiddenInput.onchange = handleImport;
-    hiddenInput.click();
+                        if (filter === "" || cellKode.includes(filter) || cellNama.includes(filter)) {
+                            row.style.display = ""; 
+                        } else {
+                            row.style.display = "none"; 
+                        }
+                    });
+                });
+                console.log("Pencarian dijalankan untuk: " + filter);
+            }, 300); 
+        });
+    }
 });
+
 // =========== DASBOARD ===============
-// Listener tetap dipertahankan (hanya isinya disesuaikan)
 document.getElementById('btnDasboard').onclick = function() {
     document.getElementById('dashboardOverlay').style.display = 'flex';
     updateDashboardStats("TAHUNAN");
@@ -892,18 +835,17 @@ function updateDashboardStats(period) {
 
     rows.forEach((row) => {
         const level = row.getAttribute('data-level');
-        // Tetap hanya memproses Level 3 sesuai struktur hirarki Anda
+        // Hanya memproses Level 3 (Detail Kategori)
         if (level !== "3") return;
 
-        // --- 1. AMBIL KODE MURNI & BERSIHKAN ---
+        // Ambil Kode Murni (Menangani struktur span di dalam cell)
         const cellKode = row.cells[1].querySelectorAll('span');
-        // Mengambil teks kode, diubah ke Uppercase dan hapus spasi
         let kodeFull = (cellKode.length > 1 ? cellKode[1].innerText : row.cells[1].innerText).trim().toUpperCase();
 
         let vRPD = 0;
         let vReal = 0;
 
-        // --- 2. AMBIL NILAI BERDASARKAN PERIODE ---
+        // Penentuan Nilai berdasarkan Periode (Tahunan vs Bulanan)
         if (period === "TAHUNAN") {
             vRPD = getVal(row.cells[5].innerText);
             vReal = getVal(row.cells[6].innerText);
@@ -919,7 +861,7 @@ function updateDashboardStats(period) {
             vReal = getVal(arrReal[pIdx]);
         }
 
-        // --- 3. FILTER JENIS BELANJA (Berdasarkan 2 Angka Depan Kode) ---
+        // Filter Jenis Belanja (Berdasarkan 2 angka depan kode)
         if (kodeFull.startsWith("51")) { 
             stats.peg.rpd += vRPD; stats.peg.real += vReal; 
         } else if (kodeFull.startsWith("52")) { 
@@ -928,23 +870,18 @@ function updateDashboardStats(period) {
             stats.mod.rpd += vRPD; stats.mod.real += vReal; 
         }
 
-        // --- 4. FILTER SUMBER DANA (Berdasarkan Huruf Belakang Kode: R atau P) ---
+        // Filter Sumber Dana (Berdasarkan huruf terakhir kode)
         if (kodeFull.endsWith("R")) { 
-            // Contoh kode: 512345R
-            stats.rm.rpd += vRPD; 
-            stats.rm.real += vReal; 
-        } 
-        else if (kodeFull.endsWith("P")) { 
-            // Contoh kode: 521111P
-            stats.pnp.rpd += vRPD; 
-            stats.pnp.real += vReal; 
+            stats.rm.rpd += vRPD; stats.rm.real += vReal; 
+        } else if (kodeFull.endsWith("P")) { 
+            stats.pnp.rpd += vRPD; stats.pnp.real += vReal; 
         }
     });
 
-    // --- 5. RENDER KE DASHBOARD ---
+    // RENDERER UNTUK BARIS DETAIL DASHBOARD
     const renderRow = (idPrefix, data) => {
         const sisa = data.rpd - data.real;
-        const prs = data.rpd > 0 ? Math.round(data.real / data.rpd * 100) : "0";
+        const prs = data.rpd > 0 ? (data.real / data.rpd * 100) : 0;
         
         const elRPD = document.getElementById(idPrefix + "_RPD");
         const elReal = document.getElementById(idPrefix + "_Real");
@@ -954,32 +891,44 @@ function updateDashboardStats(period) {
         if (elRPD) elRPD.innerText = toRp(data.rpd);
         if (elReal) elReal.innerText = toRp(data.real);
         if (elSisa) elSisa.innerText = toRp(sisa);
-        if (elPersen) elPersen.innerText = prs + "%";
+        
+        if (elPersen) {
+            elPersen.innerText = (prs === 0 ? "0" : prs.toFixed(2)) + "%";
+            // Feedback warna baris detail
+            if (prs > 105) elPersen.style.color = "#ff4d4d";
+            else if (prs > 0) elPersen.style.color = "#0f100f";
+            else elPersen.style.color = "";
+        }
     };
 
-    // Render baris demi baris
+    // Render baris kategori bawah
     renderRow("dashPeg", stats.peg);
     renderRow("dashBar", stats.bar);
     renderRow("dashMod", stats.mod);
     renderRow("dashRM", stats.rm);
     renderRow("dashPNBP", stats.pnp);
 
-    // --- 6. HITUNG & RENDER SUB-TOTAL ---
-    const tJenis = { 
-        rpd: stats.peg.rpd + stats.bar.rpd + stats.mod.rpd, 
-        real: stats.peg.real + stats.bar.real + stats.mod.real 
-    };
-    const tSumber = {
-        rpd: stats.rm.rpd + stats.pnp.rpd,
-        real: stats.rm.real + stats.pnp.real
-    };
+    // --- UPDATE MONITOR UTAMA (ATAS) ---
+    const tTotalRPD = stats.peg.rpd + stats.bar.rpd + stats.mod.rpd;
+    const tTotalReal = stats.peg.real + stats.bar.real + stats.mod.real;
 
-    renderRow("subTotalJenis", tJenis);
-    renderRow("subTotalSumber", tSumber);
+    const mRPD = document.getElementById("dashRPD");
+    const mReal = document.getElementById("dashReal");
+    // ID DI BAWAH INI HARUS 'dashPersen' AGAR COCOK DENGAN HTML ANDA
+    const mPersen = document.getElementById("dashPersen"); 
 
-    // --- 7. UPDATE MONITOR UTAMA ---
-    if (document.getElementById("dashRPD")) document.getElementById("dashRPD").innerText = toRp(tJenis.rpd);
-    if (document.getElementById("dashReal")) document.getElementById("dashReal").innerText = toRp(tJenis.real);
+    if (mRPD) mRPD.innerText = toRp(tTotalRPD);
+    if (mReal) mReal.innerText = toRp(tTotalReal);
+    
+    if (mPersen) {
+        const totalPrs = tTotalRPD > 0 ? (tTotalReal / tTotalRPD * 100) : 0;
+        mPersen.innerText = totalPrs.toFixed(2) + "%";
+        
+        // Warna Neon Green di Monitor Hitam
+        if (totalPrs > 105) mPersen.style.color = "#ff4d4d"; // Merah jika over
+        else if (totalPrs > 0) mPersen.style.color = "#0f0"; // Hijau neon
+        else mPersen.style.color = "#fff"; // Putih jika 0
+    }
 }
 // ====================
 
@@ -1018,3 +967,20 @@ window.addEventListener('beforeunload', (e) => {
 isDirty = false;
 btn.style.backgroundColor = ""; // Reset warna tombol
 
+// ======= KOLOM PENCARIAN ===========
+document.getElementById('tableSearch').addEventListener('input', function() {
+    const filter = this.value.toUpperCase();
+    const rows = document.querySelectorAll('#tableBody tr');
+
+    rows.forEach(row => {
+        // Kita cek kolom Kode (index 1) dan Nama (index 2)
+        const cellKode = row.cells[1] ? row.cells[1].textContent.toUpperCase() : "";
+        const cellNama = row.cells[2] ? row.cells[2].textContent.toUpperCase() : "";
+
+        if (cellKode.indexOf(filter) > -1 || cellNama.indexOf(filter) > -1) {
+            row.style.display = ""; // Munculkan
+        } else {
+            row.style.display = "none"; // Sembunyikan
+        }
+    });
+});
