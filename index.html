@@ -5,18 +5,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistem Anggaran Klasik - Monitoring</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="app-wrapper" id="mainApp">
         <div class="MONDAS" id="containerTotal">
             <div class="monitor-screen">
-                <div class="mon-box">
+                 <div class="mon-box">
                     <label>TOTAL PAGU</label>
+                    <span id="statTotalPaguAll">0</span>
+                </div>
+                <div class="mon-box">
+                    <label>PAGU TANPA BLOKIR</label>
                     <span id="statTotalPagu">0</span>
                 </div>
                 <div class="mon-box">
-                    <label>TOTAL BLOKIR</label>
+                    <label>PAGU BLOKIR</label>
                     <span id="statTotalBlokir" style="color: #00ff00;">0</span>
                 </div>
                   <div class="mon-box">
@@ -35,10 +41,14 @@
                 <button type="button" class="btn-tool" id="btnSave">SAVE</button>
                 <button type="button" class="btn-tool-danger" id="btnDelete">DELETE</button>
                 <button type="button" class="btn-tool-alt" id="btnAddRow">TAMBAH</button>
+                <button type="button" class="btn-tool" id="btnPDF">PDF</button>
                 <button type="button" class="btn-tool" id="btnEdit">EDIT</button>
                 <button type="button" class="btn-tool" id="btnRPD">RPD</button>
                 <button type="button" class="btn-tool" id="btnRealisasi">REALISASI</button>
                 <button type="button" class="btn-tool" id="btnDasboard">DASBOARD</button>
+                <button type="button" class="btn-tool" id="btnMonitoring" onclick="window.open('monitoring.html', '_blank')">
+                    MONITORING
+                </button>
                 <div class="search-container-classic">
                     <label for="tableSearch">PENCARIAN:</label>
                     <input type="text" id="tableSearch" class="input-classic" placeholder="Ketik Kode/Nama...">
@@ -48,19 +58,20 @@
         <div class="das2" id="containerTable">
             <table class="list-bar" id="tableAnggaran">
                 <thead>
-                 <tr>
-                    <th class="col-cb"><input type="checkbox" id="checkAllMaster"></th>
-                    <th class="col-kd">KODE</th>
-                    <th class="col-nm">NAMA PROGRAM</th>
-                    <th class="col-idr">PAGU</th>
-                    <th class="col-idr">BLOKIR</th>
-                    <th class="col-idr">RPD</th>
-                    <th class="col-idr">REALISASI</th>
-                    <th class="col-idr">TOTAL</th>
-                    <th class="col-idr">SISA</th>
+                    <tr>
+                        <th class="col-cb"><input type="checkbox" id="checkAllMaster"></th>
+                        <th class="col-kd">KODE</th>
+                        <th class="col-nm">NAMA PROGRAM</th>
+                        <th class="col-idr">PAGU</th>
+                        <th class="col-idr">BLOKIR</th>
+                        <th class="col-idr">RPD</th>
+                        <th class="col-idr">REALISASI</th>
+                        <th class="col-idr">TOTAL</th>
+                        <th class="col-idr">SISA</th>
+                    </tr>
                 </thead>
-                    <tbody id="tableBody">
-                    </tbody>
+                <tbody id="tableBody">
+                </tbody>
             </table>
         </div>
     </div>
@@ -94,14 +105,13 @@
         </div>
     </div>
 </div>
-<div id="editModal" class="modal-overlay">
-    </div>
 <div id="rpdModal" class="modal-overlay" style="display:none;">
     <div class="modal-window" style="width: 420px;">
         <div class="modal-header">
             <span>INPUT RPD 12 BULAN</span>
             <button class="btn-close" onclick="document.getElementById('rpdModal').style.display='none'">X</button>
         </div>
+
         <div class="modal-body">
             <div class="grid-rpd-container">
                 <div class="bulan-row"><label>JAN</label><input type="text" class="input-bulan"></div>
@@ -110,6 +120,7 @@
                 <div class="bulan-row"><label>APR</label><input type="text" class="input-bulan"></div>
                 <div class="bulan-row"><label>MEI</label><input type="text" class="input-bulan"></div>
                 <div class="bulan-row"><label>JUN</label><input type="text" class="input-bulan"></div>
+
                 <div class="bulan-row"><label>JUL</label><input type="text" class="input-bulan"></div>
                 <div class="bulan-row"><label>AGT</label><input type="text" class="input-bulan"></div>
                 <div class="bulan-row"><label>SEP</label><input type="text" class="input-bulan"></div>
@@ -117,13 +128,16 @@
                 <div class="bulan-row"><label>NOV</label><input type="text" class="input-bulan"></div>
                 <div class="bulan-row"><label>DES</label><input type="text" class="input-bulan"></div>
             </div>
+
             <div id="infoBarRPD" class="info-bar-horizontal">
                 <span>PAGU: 0</span>
                 <span>RPD: 0</span>
                 <span>SISA: 0</span>
             </div>
+            
             <input type="hidden" id="totalRPDInput" value="0">
         </div>
+
         <div class="modal-footer" style="padding: 15px; border-top: 1px solid #eee; text-align: right;">
             <button class="btn-tool" id="btnUpdateRPD" style="background-color: #2ecc71; color: white;">SIMPAN</button>
             <button class="btn-tool" onclick="document.getElementById('rpdModal').style.display='none'" style="background-color: #e74c3c; color: white;">BATAL</button>
@@ -136,6 +150,7 @@
             <span id="realisasiModalTitle">INPUT REALISASI 12 BULAN</span>
             <button class="btn-close" onclick="document.getElementById('realisasiModal').style.display='none'">X</button>
         </div>
+
         <div class="modal-body">
             <div class="grid-realisasi-container"> 
                 <div class="bulan-row"><label>JAN</label><input type="text" class="input-realisasi"></div>
@@ -144,6 +159,7 @@
                 <div class="bulan-row"><label>APR</label><input type="text" class="input-realisasi"></div>
                 <div class="bulan-row"><label>MEI</label><input type="text" class="input-realisasi"></div>
                 <div class="bulan-row"><label>JUN</label><input type="text" class="input-realisasi"></div>
+                
                 <div class="bulan-row"><label>JUL</label><input type="text" class="input-realisasi"></div>
                 <div class="bulan-row"><label>AGT</label><input type="text" class="input-realisasi"></div>
                 <div class="bulan-row"><label>SEP</label><input type="text" class="input-realisasi"></div>
@@ -151,13 +167,16 @@
                 <div class="bulan-row"><label>NOV</label><input type="text" class="input-realisasi"></div>
                 <div class="bulan-row"><label>DES</label><input type="text" class="input-realisasi"></div>
             </div>
+
             <div id="infoBarRealisasi" class="info-bar-horizontal">
                 <span>RPD: 0</span>
                 <span>REALISASI: 0</span>
                 <span>SISA: 0</span>
             </div>
+            
             <input type="hidden" id="totalRealisasiInput" value="0">
         </div>
+
         <div class="modal-footer" style="padding: 15px; border-top: 1px solid #eee; text-align: right; display: flex; justify-content: flex-end; gap: 10px;">
             <button class="btn-tool" id="btnUpdateRealisasi" style="background-color: #2ecc71; color: white;">SIMPAN</button>
             <button class="btn-tool" onclick="document.getElementById('realisasiModal').style.display='none'" style="background-color: #e74c3c; color: white;">BATAL</button>
@@ -191,6 +210,7 @@
                     </div>
                 </div>
             </div>
+
             <div style="margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
                 <select id="dashPeriodSelect" style="background: #fff; border: 2px inset #808080; padding: 3px; font-family: Tahoma; font-size: 12px; width: 150px;">
                     <option value="TAHUNAN">TAHUNAN</option>
@@ -268,5 +288,3 @@
 <script src="script.js"></script>
 </body>
 </html>
-
-
