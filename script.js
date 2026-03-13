@@ -145,27 +145,34 @@ document.getElementById('btnMoveUp').addEventListener('click', () => {
 // 4. SISTEM PERHITUNGAN & HIERARKI (MONDAS)
 // =====================================================================
 function calculateRowTotal(row) {
-    // Menggunakan .cells untuk performa akses DOM maksimal
     const c = row.cells;
     
-    // 1. Ambil nilai dasar dari kolom-kolom terkait
+    // 1. Ambil nilai dasar
     const pagu      = getVal(c[3].textContent); // Index 3: Pagu
-    const blokir    = getVal(c[4].textContent); // Index 4: Blokir
+    const rpd       = getVal(c[5].textContent); // Index 5: RPD
     const realisasi = getVal(c[6].textContent); // Index 6: Realisasi
 
-    // 2. LOGIKA BARU: Sisa = Pagu - Blokir - Realisasi
+    // 2. LOGIKA Sisa = Pagu - Realisasi
     const sisa = pagu - realisasi;
 
-    // 3. Render kembali ke tabel
-    c[7].textContent = toRp(realisasi); // Kolom Total = Realisasi
-    c[8].textContent = toRp(sisa);      // Kolom Sisa = Hasil hitung baru
+    // 3. Render ke tabel
+    c[7].textContent = toRp(realisasi); 
+    c[8].textContent = toRp(sisa);
 
-    // 4. Feedback visual jika sisa negatif (Over Budget)
+    // --- INDIKATOR 1: Warna Kuning jika Pagu != RPD ---
+    // Kita cek jika nilainya tidak sama, beri background kuning pada baris
+    if (pagu !== rpd) {
+        row.style.backgroundColor = "rgba(255, 255, 0, 0.2)"; // Kuning transparan agar teks tetap terbaca
+    } else {
+        row.style.backgroundColor = ""; // Kembalikan ke normal jika sama
+    }
+
+    // --- INDIKATOR 2: Warna Merah jika Sisa Negatif ---
     if (sisa < 0) {
         c[8].style.color = "#ff0000";
         c[8].style.fontWeight = "bold";
     } else {
-        c[8].style.color = "#000000";
+        c[8].style.color = ""; 
         c[8].style.fontWeight = "normal";
     }
 }
@@ -726,40 +733,47 @@ function updateDashboardTotal() {
     // 1. Ambil baris Level 0 (Grand Total)
     const topLevelRows = tableBody.querySelectorAll('tr[data-level="0"]');
     
-    let totals = { pagu: 0, blokir: 0, rpd: 0, real: 0 };
+    let totals = { 
+        paguBersih: 0, // Nilai yang ada di kolom Pagu
+        paguTotal: 0,  // Pagu + Blokir
+        blokir: 0, 
+        rpd: 0, 
+        real: 0 
+    };
 
     // 2. Kalkulasi Batch
     topLevelRows.forEach(row => {
         const c = row.cells; 
         if (c.length > 6) {
-            totals.pagu   += getVal(c[3].textContent);
-            totals.blokir += getVal(c[4].textContent);
-            totals.rpd    += getVal(c[5].textContent);
-            totals.real   += getVal(c[6].textContent);
+            const p = getVal(c[3].textContent); // Nilai kolom Pagu
+            const b = getVal(c[4].textContent); // Nilai kolom Blokir
+            
+            totals.paguBersih += p;
+            totals.blokir     += b;
+            totals.paguTotal  += (p + b); // Pagu Tanpa Blokir + Pagu Blokir
+            
+            totals.rpd        += getVal(c[5].textContent);
+            totals.real       += getVal(c[6].textContent);
         }
     });
 
-    // --- HITUNG PERSENTASE (Tambahan agar tidak 0) ---
-    // Rumus: Realisasi / RPD * 100
     const prsTotal = totals.rpd > 0 ? (totals.real / totals.rpd * 100) : 0;
 
-    // 3. Render Batch (Ditambah target dashPersen)
+    // 3. Render ke DOM
     const elements = {
-        'statTotalPagu': toRp(totals.pagu),
+        'statTotalPaguAll': toRp(totals.paguTotal),  // ID baru Anda
+        'statTotalPagu': toRp(totals.paguBersih),    // Pagu yang sudah dikurangi blokir
         'statTotalBlokir': toRp(totals.blokir),
         'statTotalRPD': toRp(totals.rpd),
         'statTotalRealisasi': toRp(totals.real),
-        'dashPersen': prsTotal.toFixed(2) + "%" // Sesuai ID HTML Anda
+        'dashPersen': prsTotal.toFixed(2) + "%"
     };
 
     for (const [id, value] of Object.entries(elements)) {
         const el = document.getElementById(id);
         if (el) {
-            // Hanya update DOM jika nilainya berubah
             if (el.textContent !== value) {
                 el.textContent = value;
-
-                // Tambahan: Warna hijau neon untuk teks persentase
                 if (id === 'dashPersen') {
                     el.style.color = (prsTotal > 0) ? "#0f0" : "#fff";
                 }
@@ -984,3 +998,113 @@ document.getElementById('tableSearch').addEventListener('input', function() {
         }
     });
 });
+// ============== PDF GENERATOR (ULTIMATE FIX) ====================
+document.getElementById('btnPDF').onclick = function () {
+    try {
+        // 1. Cek Namespace jsPDF (Mendukung berbagai cara load library)
+        const { jsPDF } = window.jspdf || window; 
+        
+        if (!jsPDF) {
+            alert("Error: Library jsPDF tidak ditemukan. Pastikan CDN sudah terpasang di HTML.");
+            return;
+        }
+
+        // 2. Inisialisasi Document (Landscape, Unit mm, Ukuran A4)
+        const doc = new jsPDF({
+            orientation: 'landscape',
+            unit: 'mm',
+            format: 'a4'
+        });
+
+        // 3. Ambil Data dari TableBody
+        const tableBody = document.getElementById('tableBody');
+        const rows = Array.from(tableBody.querySelectorAll('tr'));
+        
+        // Hanya ambil baris yang terlihat (tidak kena filter search)
+        const visibleRows = rows.filter(row => row.style.display !== 'none');
+
+        if (visibleRows.length === 0) {
+            alert("Tabel kosong, tidak ada data untuk diekspor.");
+            return;
+        }
+
+        // 4. Mapping Data dengan Indentasi Hirarki
+        const bodyData = visibleRows.map(row => {
+            const c = row.cells;
+            const level = parseInt(row.getAttribute('data-level')) || 0;
+            
+            // Indentasi untuk Nama (Kolom 2)
+            const prefix = "   ".repeat(level); 
+
+            return [
+                c[1] ? c[1].innerText.trim() : '',              // KODE
+                c[2] ? prefix + c[2].innerText.trim() : '',      // NAMA
+                c[3] ? c[3].innerText.trim() : '0',              // PAGU
+                c[4] ? c[4].innerText.trim() : '0',              // BLOKIR
+                c[5] ? c[5].innerText.trim() : '0',              // RPD
+                c[6] ? c[6].innerText.trim() : '0',              // REALISASI
+                c[7] ? c[7].innerText.trim() : '0',              // TOTAL
+                c[8] ? c[8].innerText.trim() : '0'               // SISA
+            ];
+        });
+
+        // 5. Header Laporan
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(14);
+        doc.text("LAPORAN MONITORING REALISASI ANGGARAN", 14, 15);
+        
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        doc.text(`Dicetak pada: ${new Date().toLocaleString('id-ID')}`, 14, 22);
+
+        // 6. Eksekusi AutoTable (PENTING: Pastikan plugin autotable sudah load)
+        if (typeof doc.autoTable !== 'function') {
+            alert("Error: Plugin AutoTable tidak ditemukan. Tambahkan: <script src='https://unpkg.com/jspdf-autotable'></script>");
+            return;
+        }
+
+        doc.autoTable({
+            startY: 28,
+            head: [['KODE', 'NAMA PROGRAM / KEGIATAN', 'PAGU', 'BLOKIR', 'RPD', 'REALISASI', 'TOTAL', 'SISA']],
+            body: bodyData,
+            theme: 'grid',
+            styles: { fontSize: 7, cellPadding: 2 },
+            headStyles: { fillColor: [41, 128, 185], textColor: 255, halign: 'center' },
+            columnStyles: {
+                0: { cellWidth: 20 },
+                1: { cellWidth: 'auto' },
+                2: { halign: 'right' },
+                3: { halign: 'right' },
+                4: { halign: 'right' },
+                5: { halign: 'right' },
+                6: { halign: 'right' },
+                7: { halign: 'right' }
+            },
+            didParseCell: function(data) {
+                // Mewarnai baris induk (Level 0)
+                if (data.section === 'body') {
+                    const level0 = !data.row.cells[1].raw.startsWith("   ");
+                    if (level0) {
+                        data.cell.styles.fontStyle = 'bold';
+                        data.cell.styles.fillColor = [240, 240, 240];
+                    }
+                }
+                
+                // Mewarnai teks merah jika sisa negatif di kolom indeks 7
+                if (data.column.index === 7 && data.section === 'body') {
+                    const valStr = data.cell.raw.toString().replace(/\./g, '');
+                    if (parseInt(valStr) < 0) {
+                        data.cell.styles.textColor = [200, 0, 0];
+                    }
+                }
+            }
+        });
+
+        // 7. Download PDF
+        doc.save(`Laporan_Anggaran_${Date.now()}.pdf`);
+
+    } catch (err) {
+        console.error("PDF Error:", err);
+        alert("Gagal membuat PDF. Cek Console (F12) untuk detail.");
+    }
+};
