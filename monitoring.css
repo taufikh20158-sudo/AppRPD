@@ -1,0 +1,279 @@
+/* --- 1. VARIABLES & RESET --- */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&family=Poppins:wght@400;600;700;800&family=JetBrains+Mono:wght@700;800&display=swap');
+
+:root {
+    --bg-master: #f0f3f7;
+    --bg-panel: #ffffff;
+    --accent-gold: #d4af37;
+    --accent-blue: #2c3e50;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Poppins', sans-serif; }
+
+/* --- RESET UTAMA --- */
+body, html { 
+    width: 100vw; 
+    height: 100vh; 
+    margin: 0;
+    overflow: hidden; /* Mencegah double scrollbar pada browser */
+    background: var(--bg-master); 
+}
+
+#MASTERMAIN { 
+    display: flex; 
+    width: 100%; 
+    height: 100%; 
+    padding: 20px; 
+    gap: 20px; 
+    box-sizing: border-box;
+}
+
+/* --- AREA KERJA UTAMA --- */
+/* --- CONTAINER UTAMA (PENTING!) --- */
+#MAIN_CONTENT_AREA {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+    border: 1px solid #000;
+    
+    /* SCROLL HORIZONTAL HANYA DI SINI */
+    overflow-x: auto !important; 
+    overflow-y: hidden; 
+    height: 100%;
+}
+
+/* Pastikan Header (CON1) dan Data (CON2) punya lebar minimal yang SAMA */
+#CON1, #CON2 {
+    /* Total: 100+300+100+1080+100+100+100 = 1880px */
+    min-width: 1880px; 
+    width: 100%;
+}
+
+#CON1 {
+    flex-shrink: 0;
+    background: #f3f4f6;
+    border-bottom: 2px solid #000;
+}
+
+#CON2 {
+    flex: 1;
+    overflow-y: auto; /* Scroll Vertikal aktif di sini */
+    overflow-x: hidden; /* Matikan agar tidak ada double scroll */
+}
+
+/* --- GRID SYSTEM --- */
+/* --- GRID SYSTEM (DIPERBARUI) --- */
+.header-style, .grid-row {
+    display: grid !important;
+    /* KODE(100) | NAMA(1fr) | PAGU(100) | BULAN(1080) | TOTAL(100) | BLOKIR(100) | SISA(130) */
+    /* Kolom Sisa Dana dinaikkan ke 130px */
+    grid-template-columns: 100px minmax(300px, 1fr) 100px 1080px 100px 100px 130px !important;
+    
+    /* Total min-width baru: 100+300+100+1080+100+100+130 = 2010px */
+    min-width: 2010px; 
+    width: 100%;
+}
+
+/* Pastikan container mengikuti lebar minimal baru */
+#CON1, #CON2 {
+    min-width: 2010px;
+    width: 100%;
+}
+
+/* --- OPTIMASI KOLOM SISA DANA --- */
+.col-sisa, #HEAD_SISA {
+    width: 130px; /* Sesuai grid di atas */
+    justify-content: flex-end;
+    font-weight: 800 !important;
+    color: #1d4ed8 !important;
+    
+    /* Ruang tambahan agar nominal tidak "tertindih" scrollbar vertikal */
+    padding-right: 20px !important; 
+    box-sizing: border-box;
+}
+
+/* Mempercantik Scrollbar agar tidak menutupi konten (Opsional) */
+#CON2::-webkit-scrollbar {
+    width: 8px;
+}
+#CON2::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+#CON2::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+}
+#CON2::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+/* --- HEADER (CON1) --- */
+#CON1 {
+    background: #f3f4f6;
+    border-bottom: 2px solid #000;
+}
+
+.header-style > div {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 8.5px; 
+    font-weight: 800;
+    text-transform: uppercase;
+    color: #1e293b;
+    border-right: 1px solid #000;
+}
+
+#HEAD_BULAN_GROUP {
+    display: grid !important;
+    grid-template-columns: repeat(12, 1fr) !important;
+}
+
+#HEAD_BULAN_GROUP span {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 8.5px;
+    border-right: none !important; /* Hilangkan garis antar bulan di header */
+}
+
+/* --- DATA AREA (CON2) --- */
+#CON2 {
+    flex: 1;
+    overflow-y: auto; /* Scroll vertikal hanya di sini */
+}
+
+.grid-row {
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.grid-row > div {
+    display: flex;
+    align-items: center;
+    padding: 4px 8px;
+    font-size: 9.5px;
+    color: #000000 !important; /* Hitam Pekat */
+    border-right: none !important; /* Hilangkan garis vertikal antar kolom */
+}
+
+/* --- ANGKA NOMINAL & WARNA --- */
+.col-pagu { font-weight: 700; color: #000 !important; justify-content: flex-end; }
+.col-total { font-weight: 800; color: #059669 !important; justify-content: flex-end; }
+.col-blokir { font-weight: 700; color: #dc2626 !important; justify-content: flex-end; }
+.col-sisa { font-weight: 800; color: #1d4ed8 !important; justify-content: flex-end; }
+
+.col-bulan-inputs {
+    display: grid !important;
+    grid-template-columns: repeat(12, 1fr) !important;
+    background: rgba(0, 0, 0, 0.02);
+}
+
+.input-bulan-cell {
+    text-align: right;
+    padding-right: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    color: #000000 !important;
+}
+
+/* --- HIRARKI --- */
+.lvl-0 { background-color: #cbd5e1 !important; font-weight: 800; }
+.lvl-1 { background-color: #e2e8f0 !important; font-weight: 700; }
+.lvl-2 { background-color: #f1f5f9 !important; }
+.lvl-4 .col-kode { padding-left: 70px !important; }
+
+/* Scrollbar */
+#MAIN_TABLE_WRAPPER::-webkit-scrollbar { height: 10px; }
+#MAIN_TABLE_WRAPPER::-webkit-scrollbar-thumb { background: #334155; border-radius: 5px; }
+
+/* ============================================================
+   NAVBAR (TINY_NAV) - REFINED & PRO STYLE
+   ============================================================ */
+/* ============================================================
+   NAVBAR (TINY_NAV) - MINIMALIST & COMPACT
+   ============================================================ */
+
+.nav-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding: 5px;
+    background: #ffffff;
+    border-radius: 6px;
+    border: 1px solid #e2e8f0;
+    width: fit-content;
+}
+
+/* Tombol Kecil Biasa */
+.btn-tiny {
+    width: 40px; 
+    height: 26px; 
+    font-size: 9px;
+    font-weight: 600;
+    color: #475569;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.1s ease;
+}
+
+.btn-tiny:hover {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+    color: #1e293b;
+}
+
+/* Tombol Merah (PDF) Tetap Kecil */
+.btn-red {
+    color: #e11d48 !important;
+    border-color: #fecdd3 !important;
+}
+
+.btn-red:hover {
+    background: #e11d48 !important;
+    color: #ffffff !important;
+}
+
+/* ============================================================
+   DROPDOWN (SAMPING TANPA ANIMASI BERLEBIH)
+   ============================================================ */
+.dropdown {
+    position: relative;
+}
+
+.dropdown-items {
+    display: none; /* Sembunyikan default */
+    position: absolute;
+    top: 0;
+    left: calc(100% + 5px); /* Muncul tepat di samping */
+    background: #ffffff;
+    min-width: 80px;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    box-shadow: 2px 2px 8px rgba(0,0,0,0.1);
+    z-index: 1000;
+}
+
+/* Munculkan saat hover */
+.dropdown:hover .dropdown-items {
+    display: block;
+}
+
+.dropdown-items a {
+    display: block;
+    padding: 6px 10px;
+    font-size: 9px;
+    font-weight: 600;
+    color: #475569;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.dropdown-items a:hover {
+    background: #f1f5f9;
+    color: #1e293b;
+}
