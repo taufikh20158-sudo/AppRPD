@@ -37,43 +37,61 @@ body {
 /* --- MONDAS (Dashboard Section) --- */
 .MONDAS {
     background: var(--win-gray);
-    padding: 4px;
+    padding: 2px;
     border: 2px solid;
     border-color: var(--win-light) var(--win-dark) var(--win-dark) var(--win-light);
+    /* Pastikan memenuhi ruang induknya */
+    width: 100%; 
+    box-sizing: border-box;
 }
 
 .monitor-screen {
     background: #000;
-    border: 3px inset var(--win-dark);
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 1px; /* Garis antar box */
-    padding: 10px;
+    border: 2px inset var(--win-dark);
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    /* Menghilangkan gap agar border-right yang jadi pemisah */
+    gap: 0; 
+    padding: 5px 0; /* Padding atas bawah saja */
+    width: 100%;
 }
 
 .mon-box {
-    padding: 5px 15px;
-    border-right: 1px solid #fcfbfb;
+    /* flex: 1 membuat setiap box membagi ruang secara rata ke kanan */
+    flex: 1; 
+    padding: 2px 15px;
+    border-right: 1px solid #333;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    white-space: nowrap;
+    /* Pastikan konten di dalam box rata kiri (atau center jika ingin simetris) */
+    align-items: flex-start; 
 }
 
-.mon-box:last-child { border-right: none; }
+.mon-box:last-child { 
+    border-right: none; 
+}
 
 .mon-box label {
     display: block;
     color: #888;
-    font-size: 10px;
+    font-size: 9px;
     font-weight: bold;
-    margin-bottom: 4px;
+    margin-bottom: 2px;
+    letter-spacing: 0.5px;
 }
 
 .mon-box span {
     color: var(--neon-green);
     font-family: 'Courier New', Courier, monospace;
-    font-size: 20px;
+    font-size: 16px;
     font-weight: bold;
     text-shadow: 0 0 5px rgba(0, 255, 0, 0.5);
+    line-height: 1;
 }
-
 /* --- DAS 1 (Toolbar Section) --- */
 .das1 {
     background: var(--win-gray);
@@ -354,7 +372,7 @@ tr[data-level="0"] {
 
 /* Warna Sisa di dalam Info Bar */
 .text-sisa-aman { color: #aaffaa; }
-.text-sisa-bahaya { color: #ffb3b3; font-weight: bold; }
+.text-sisa-bahaya { color: #ffb3b3; }
 /*========= FORM REALISASI =============
 /* --- CSS UNTUK MODAL RPD & REALISASI (IDENTIK) --- */
 
@@ -416,7 +434,6 @@ tr[data-level="0"] {
 .text-sisa-bahaya { 
     color: #ff5555; 
     font-weight: bold; 
-    text-decoration: underline;
 }
 
 /* Styling Modal Window agar pas dengan 2 kolom */
