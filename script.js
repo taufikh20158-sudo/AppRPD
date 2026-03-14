@@ -985,3 +985,21 @@ document.addEventListener('DOMContentLoaded', () => {
     initMoneyInputs();
     loadDataFromSupabase();
 });
+
+async function logoutAplikasi() {
+    // 1. Konfirmasi ke pengguna (Gaya Windows)
+    const yakin = confirm("Apakah Anda yakin ingin keluar dari Sistem RPD?");
+    
+    if (yakin) {
+        // 2. Proses logout dari Supabase
+        const { error } = await supabaseClient.auth.signOut();
+        
+        if (error) {
+            alert("Gagal keluar: " + error.message);
+        } else {
+            // 3. Kembali ke halaman login
+            // alert("Anda telah keluar secara aman.");
+            window.location.href = 'login.html';
+        }
+    }
+}
