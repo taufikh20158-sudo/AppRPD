@@ -6,6 +6,7 @@ const { createClient } = window.supabase;
 const _supabase = createClient('https://ldkefnlnpgwgxznemzol.supabase.co', 'sb_publishable_VG1TQwsg40s9ngumFAy-CQ_ORaBQKHG');
 
 const containerData = document.getElementById('CON2');
+let currentMode = 'RPD'; // State untuk melacak mode aktif
 
 // =====================================================================
 // HELPER UTAMA
@@ -15,11 +16,34 @@ const toRp = (num) => {
     return Math.round(num).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
 };
 
+/**
+ * Parser Fleksibel: Mengubah data mentah (String/Array) menjadi Array 12 Bulan
+ */
+const parseBulanan = (data) => {
+    if (!data) return new Array(12).fill(0);
+    
+    // Jika data sudah berupa Array (JSON dari Supabase)
+    if (Array.isArray(data)) return data;
+
+    // Jika data berupa string JSON "[0,0,100...]"
+    if (typeof data === 'string' && data.startsWith('[')) {
+        try { return JSON.parse(data); } catch (e) { return new Array(12).fill(0); }
+    }
+
+    // Jika data berupa string dengan pemisah pipa "0|0|100..."
+    if (typeof data === 'string' && data.includes('|')) {
+        return data.split('|').map(Number);
+    }
+
+    return new Array(12).fill(0);
+};
+
 // =====================================================================
 // CORE FUNCTION: LOAD & RENDER
 // =====================================================================
 async function loadMonitoringData(mode = 'RPD') {
     if (!containerData) return console.error("Elemen CON2 tidak ditemukan di HTML!");
+    currentMode = mode; // Simpan mode aktif
 
     containerData.innerHTML = `<div style='padding:20px; color:#4ade80; text-align:center;'>MEMUAT DATA ${mode}...</div>`;
 
@@ -38,26 +62,22 @@ async function loadMonitoringData(mode = 'RPD') {
         containerData.innerHTML = ""; 
 
         data.forEach(item => {
-            const rawData = (mode === 'RPD' ? item.rpd_bulanan : item.real_bulanan) || "0|0|0|0|0|0|0|0|0|0|0|0";
-            const bulananArr = rawData.split('|');
+            // GUNAKAN PARSER BARU UNTUK MENGHINDARI ERROR .SPLIT()
+            const rawData = mode === 'RPD' ? item.rpd_bulanan : item.real_bulanan;
+            const bulananArr = parseBulanan(rawData);
             
             const row = document.createElement('div');
-            // Gunakan class lvl- agar sesuai dengan indentasi di CSS
             row.className = `grid-row lvl-${item.level}`;
             
-            // AREA BULAN: Menggunakan class input-bulan-cell agar terbaca CSS (Hitam & Tanpa Garis)
             let bulanHTML = `<div class="col-bulan-inputs">`; 
             bulananArr.forEach(val => {
-                const valNum = parseInt(val) || 0;
-                // MENGHAPUS LOGIKA WARNA JS (#444/#ccc) agar mengikuti CSS (Hitam)
-                bulanHTML += `<span class="input-bulan-cell">${toRp(valNum)}</span>`;
+                bulanHTML += `<span class="input-bulan-cell">${toRp(val)}</span>`;
             });
             bulanHTML += `</div>`;
 
             const totalTampil = mode === 'RPD' ? (item.rpd_total || 0) : (item.real_total || 0);
             const sisa = (item.pagu || 0) - (item.real_total || 0);
 
-            // Menyusun kolom agar sesuai dengan urutan Header
             row.innerHTML = `
                 <div class="col-kode lvl-${item.level}">${item.kode || ''}</div>
                 <div class="col-nama">${item.nama || ''}</div>
@@ -80,14 +100,11 @@ async function loadMonitoringData(mode = 'RPD') {
 // EVENT LISTENERS
 // =====================================================================
 document.addEventListener('DOMContentLoaded', () => {
-    // 1. Load data awal
     loadMonitoringData('RPD');
 
-    // 2. Delegasi Event Klik
     document.addEventListener('click', (e) => {
         const target = e.target;
 
-        // --- Logika Dropdown RPD/REAL ---
         if (target.tagName === 'A' && target.closest('.dropdown-items')) {
             const text = target.innerText.toUpperCase();
             if (text.includes('RPD')) {
@@ -99,18 +116,12 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        // --- Logika Tombol PDF (ID: btnPDF) ---
-        // Kita gunakan .closest() agar jika user klik teks di dalam tombol, tetap terdeteksi
         if (target.id === 'btnPDF' || target.closest('#btnPDF')) {
             e.preventDefault();
             exportToPDF();
         }
     });
 });
-
-/**
- * Fungsi Ekspor PDF dengan jsPDF & AutoTable
- */
 async function exportToPDF() {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF('l', 'mm', 'a2'); 
