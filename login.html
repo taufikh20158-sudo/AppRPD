@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Monitoring RPD 2026 - Booting...</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --win-gray: #c0c0c0;
+            --win-white: #ffffff;
+            --win-shadow: #808080;
+            --win-dark: #000000;
+            --win-blue: #000080;
+            --win-blue-light: #1084d0;
+        }
+
+        * { box-sizing: border-box; cursor: url('https://win98icons.alexmeub.com/cursors/arrow.cur'), auto; }
+
+        body, html {
+            margin: 0; padding: 0;
+            height: 100vh; width: 100vw;
+            background-color: #008080;
+            font-family: 'Tahoma', 'Arial', sans-serif;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* EFEK MONITOR CRT (SCANLINES) */
+        body::before {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%), 
+                        linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+            z-index: 9999;
+            background-size: 100% 3px, 3px 100%;
+            pointer-events: none;
+        }
+
+        /* DESKTOP AREA */
+        .desktop {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding-bottom: 30px;
+        }
+
+        /* JENDELA LOGIN 3D */
+        .login-window {
+            width: 420px;
+            background-color: var(--win-gray);
+            border: 2px solid;
+            border-color: var(--win-white) var(--win-dark) var(--win-dark) var(--win-white);
+            padding: 2px;
+            box-shadow: 4px 4px 10px rgba(0,0,0,0.3);
+            animation: bootUp 0.5s ease-out;
+        }
+
+        @keyframes bootUp {
+            0% { transform: scale(0.5); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .title-bar {
+            background: linear-gradient(90deg, var(--win-blue), var(--win-blue-light));
+            padding: 3px 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .title-bar-text {
+            color: white; font-weight: bold; font-size: 11px;
+            display: flex; align-items: center; gap: 6px;
+        }
+
+        .title-bar-controls button {
+            width: 16px; height: 14px;
+            background-color: var(--win-gray);
+            border: 1px solid;
+            border-color: var(--win-white) var(--win-dark) var(--win-dark) var(--win-white);
+            font-size: 9px; cursor: pointer;
+            font-weight: bold;
+        }
+
+        .window-body { padding: 20px; }
+
+        /* FORM STYLING */
+        .login-content { display: flex; gap: 20px; }
+        .login-main { flex: 1; }
+        .login-main p { font-size: 11px; margin-top: 0; line-height: 1.5; }
+
+        .field-row { display: flex; align-items: center; margin-bottom: 10px; }
+        .field-row label { width: 80px; font-size: 11px; }
+        .field-row input {
+            flex-grow: 1; padding: 4px;
+            border: 2px solid;
+            border-color: var(--win-shadow) var(--win-white) var(--win-white) var(--win-shadow);
+            outline: none; font-size: 12px;
+        }
+
+        .btn-classic {
+            min-width: 80px; padding: 4px 10px;
+            background-color: var(--win-gray);
+            border: 2px solid;
+            border-color: var(--win-white) var(--win-dark) var(--win-dark) var(--win-white);
+            font-size: 11px; cursor: pointer;
+        }
+
+        .btn-classic:active {
+            border-color: var(--win-dark) var(--win-white) var(--win-white) var(--win-dark);
+            padding: 5px 9px 3px 11px;
+        }
+
+        /* TASKBAR */
+        .taskbar {
+            height: 30px; background: var(--win-gray);
+            border-top: 2px solid var(--win-white);
+            display: flex; padding: 2px; align-items: center;
+            position: relative; z-index: 100;
+        }
+
+        .start-btn {
+            height: 24px; font-weight: bold;
+            display: flex; align-items: center; gap: 5px;
+            padding: 0 8px; border: 2px solid;
+            border-color: var(--win-white) var(--win-dark) var(--win-dark) var(--win-white);
+            background: var(--win-gray); font-size: 12px;
+        }
+
+        .start-btn:active { border-color: var(--win-dark) var(--win-white) var(--win-white) var(--win-dark); }
+
+        .system-tray {
+            margin-left: auto; border: 2px solid;
+            border-color: var(--win-shadow) var(--win-white) var(--win-white) var(--win-shadow);
+            height: 24px; display: flex; align-items: center;
+            padding: 0 10px; font-size: 11px; gap: 8px;
+        }
+
+        /* LOGIN SUCCESS SHAKE */
+        .error-shake { animation: shake 0.2s ease-in-out 0s 2; }
+        @keyframes shake {
+            0% { margin-left: 0; } 25% { margin-left: 5px; } 75% { margin-left: -5px; } 100% { margin-left: 0; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="desktop">
+        <div class="login-window" id="loginWin">
+            <div class="title-bar">
+                <div class="title-bar-text">
+                    <img src="https://win98icons.alexmeub.com/icons/png/key_padlock-0.png" width="14"> 
+                    Keamanan Jaringan v1.0
+                </div>
+                <div class="title-bar-controls">
+                    <button>?</button>
+                    <button>x</button>
+                </div>
+            </div>
+
+            <div class="window-body">
+                <div class="login-content">
+                    <div class="login-main">
+                        <p>Akses Terbatas! Masukkan kata sandi administrator untuk mengelola RPD 2026.</p>
+                        <form id="loginForm">
+                            <div class="field-row">
+                                <label>User:</label>
+                                <input id="email" type="email" value="admin@rpd.id" readonly>
+                            </div>
+                            <div class="field-row">
+                                <label>Sandi:</label>
+                                <input id="password" type="password" placeholder="********" required autofocus>
+                            </div>
+                            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 15px;">
+                                <button type="submit" class="btn-classic">Masuk</button>
+                                <button type="button" class="btn-classic" onclick="alert('Akses dibatalkan.')">Batal</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div style="background: var(--win-gray); border-top: 1px solid var(--win-shadow); padding: 4px; font-size: 10px;" id="statusMsg">
+                Status: Siap.
+            </div>
+        </div>
+    </div>
+
+    <div class="taskbar">
+        <button class="start-btn" onclick="alert('Sistem akan dikunci sampai Anda login.')">
+            <img src="https://win98icons.alexmeub.com/icons/png/windows-0.png" width="16">
+            Start
+        </button>
+        <div class="system-tray">
+            <img src="https://win98icons.alexmeub.com/icons/png/loudspeaker_rays-0.png" width="14">
+            <div id="clock">00:00</div>
+        </div>
+    </div>
+
+    <script>
+        // --- KONFIGURASI SUPABASE ---
+        const SUPABASE_URL = 'https://ldkefnlnpgwgxznemzol.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxka2VmbmxucGd3Z3h6bmVtem9sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwODE5NDYsImV4cCI6MjA4NzY1Nzk0Nn0.aRvd4POq_HdTdYVAU-Nl-RFNjeqgPjbNteRYyDdUIvE';
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        const loginForm = document.getElementById('loginForm');
+        const loginWin = document.getElementById('loginWin');
+        const statusMsg = document.getElementById('statusMsg');
+
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            statusMsg.innerText = "Status: Memeriksa database...";
+            
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            const { data, error } = await supabaseClient.auth.signInWithPassword({
+                email: email,
+                password: password,
+            });
+
+            if (error) {
+                loginWin.classList.add('error-shake');
+                statusMsg.innerText = "Status: Kesalahan login.";
+                setTimeout(() => loginWin.classList.remove('error-shake'), 400);
+                alert("Akses Ditolak: " + error.message);
+            } else {
+                statusMsg.innerText = "Status: Akses Diterima!";
+                // Efek fade out sebelum pindah halaman
+                loginWin.style.opacity = '0.5';
+                window.location.href = 'index.html';
+            }
+        });
+
+        // Jam Real-time
+        function startTime() {
+            const today = new Date();
+            let h = today.getHours(); let m = today.getMinutes();
+            m = m < 10 ? "0" + m : m;
+            document.getElementById('clock').innerHTML = h + ":" + m;
+            setTimeout(startTime, 1000);
+        }
+        startTime();
+    </script>
+</body>
+</html>
