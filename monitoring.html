@@ -9,6 +9,32 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link rel="stylesheet" href="monitoring.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700;900&family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+    <script>
+        const supabaseUrl = 'https://ldkefnlnpgwgxznemzol.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxka2VmbmxucGd3Z3h6bmVtem9sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwODE5NDYsImV4cCI6MjA4NzY1Nzk0Nn0.aRvd4POq_HdTdYVAU-Nl-RFNjeqgPjbNteRYyDdUIvE'; 
+        const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
+
+        async function cekAkses() {
+            try {
+                // Ambil sesi terbaru
+                const { data: { session }, error } = await supabaseClient.auth.getSession();
+                
+                if (!session || error) {
+                    // JIKA TIDAK LOGIN: Tendang ke login.html
+                    // Gunakan path relatif yang aman
+                    window.location.replace('login.html');
+                } else {
+                    // JIKA LOGIN SAH: Buka gembok tampilan
+                    document.documentElement.style.display = 'block';
+                }
+            } catch (err) {
+                window.location.replace('login.html');
+            }
+        }
+        
+        // Jalankan pengecekan
+        cekAkses();
+    </script>
 </head>
 <body id="MASTERMAIN">
 <nav id="TINY_NAV">
