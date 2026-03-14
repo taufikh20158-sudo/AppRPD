@@ -16,16 +16,17 @@ const realisasiModal = document.getElementById('realisasiModal');
 let currentRowForEdit = null;
 let targetRowRPD = null;
 let targetRowRealisasi = null;
+// Simpan nilai acuan global
+let targetPaguTotal = 0;
+let targetBlokirTotal = 0;
 
 // =====================================================================
 // 2. HELPER UTAMA (FORMATTER & PARSER)
 // =====================================================================
 const getVal = (str) => {
     if (!str) return 0;
-    // Menggunakan regex \D untuk menghapus semua karakter selain angka
-    // Ini jauh lebih aman untuk membersihkan format "1.500.000"
-    let clean = str.toString().replace(/\D/g, "");
-    return parseInt(clean) || 0;
+    let clean = str.toString().replace(/[^0-9]/g, ""); 
+    return parseInt(clean, 10) || 0;
 };
 
 const toRp = (num) => {
@@ -39,12 +40,27 @@ function formatRibuan(angka) {
     return nilai.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
 }
 
-// Pasang format otomatis ke semua input uang di modal
-['editPagu', 'editBlokir', 'totalRPDInput', 'totalRealisasiInput'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.addEventListener('input', function() { this.value = formatRibuan(this.value); });
-});
+function initMoneyInputs() {
+    const mainInputs = ['editPagu', 'editBlokir', 'inputPagu', 'inputBlokir'];
+    const monthlySelectors = ['.input-bulan', '.input-realisasi'];
 
+    mainInputs.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener('input', function() {
+                this.value = formatRibuan(this.value);
+            });
+        }
+    });
+
+    document.querySelectorAll(monthlySelectors.join(',')).forEach(el => {
+        el.addEventListener('input', function() {
+            this.value = formatRibuan(this.value);
+        });
+    });
+}
+
+document.addEventListener('DOMContentLoaded', initMoneyInputs);
 // =====================================================================
 // 3. LOGIKA MANIPULASI TABEL (ADD, DELETE, MOVE)
 // =====================================================================
@@ -52,9 +68,8 @@ function formatRibuan(angka) {
 function createNewRow(level, afterElement = null) {
     const row = document.createElement('tr');
     row.setAttribute('data-level', level);
-    row.dataset.rpdBulanan = "0|0|0|0|0|0|0|0|0|0|0|0";
-    row.dataset.realisasiBulanan = "0|0|0|0|0|0|0|0|0|0|0|0";
-    
+    row.dataset.rpdBulanan = JSON.stringify(new Array(12).fill(0));
+    row.dataset.realisasiBulanan = JSON.stringify(new Array(12).fill(0));
     const paddingLeft = level * 15; 
     const symbol = level > 0 ? '' : '';
 
@@ -147,27 +162,21 @@ document.getElementById('btnMoveUp').addEventListener('click', () => {
 function calculateRowTotal(row) {
     const c = row.cells;
     
-    // 1. Ambil nilai dasar
-    const pagu      = getVal(c[3].textContent); // Index 3: Pagu
-    const rpd       = getVal(c[5].textContent); // Index 5: RPD
-    const realisasi = getVal(c[6].textContent); // Index 6: Realisasi
+    const pagu      = getVal(c[3].textContent);
+    const rpd       = getVal(c[5].textContent);
+    const realisasi = getVal(c[6].textContent);
 
-    // 2. LOGIKA Sisa = Pagu - Realisasi
     const sisa = pagu - realisasi;
 
-    // 3. Render ke tabel
     c[7].textContent = toRp(realisasi); 
     c[8].textContent = toRp(sisa);
 
-    // --- INDIKATOR 1: Warna Kuning jika Pagu != RPD ---
-    // Kita cek jika nilainya tidak sama, beri background kuning pada baris
     if (pagu !== rpd) {
-        row.style.backgroundColor = "rgba(255, 255, 0, 0.2)"; // Kuning transparan agar teks tetap terbaca
+        row.style.backgroundColor = "rgba(255, 255, 0, 0.2)";
     } else {
-        row.style.backgroundColor = ""; // Kembalikan ke normal jika sama
+        row.style.backgroundColor = "";
     }
 
-    // --- INDIKATOR 2: Warna Merah jika Sisa Negatif ---
     if (sisa < 0) {
         c[8].style.color = "#ff0000";
         c[8].style.fontWeight = "bold";
@@ -176,95 +185,79 @@ function calculateRowTotal(row) {
         c[8].style.fontWeight = "normal";
     }
 }
-/**
- * Mengupdate akumulasi nilai hirarki dari bawah ke atas.
- * Optimasi: Menggunakan caching koleksi baris dan meminimalkan query DOM.
- */
 function updateMondas() {
     const rows = Array.from(tableBody.rows);
-    const rowCount = rows.length;
-    if (rowCount === 0) return;
+    if (rows.length === 0) return;
 
-    // Loop Bottom-Up: Penting agar nilai anak naik ke cucu, lalu ke induk
-    for (let i = rowCount - 1; i >= 0; i--) {
+    // --- STEP 1: AKUMULASI HIRARKI (Bottom-Up) ---
+    // Loop dari bawah ke atas agar nilai anak terjumlah ke induk secara berantai
+    for (let i = rows.length - 1; i >= 0; i--) {
         const row = rows[i];
         const level = parseInt(row.getAttribute('data-level')) || 0;
-        const cells = row.cells; 
-
-        // Optimasi: Cek apakah baris ini memiliki anak
+        const cells = row.cells;
+        
         const nextRow = rows[i + 1];
         const hasChild = (nextRow && (parseInt(nextRow.getAttribute('data-level')) || 0) > level);
 
         if (hasChild) {
             let sums = { pagu: 0, blokir: 0, rpd: 0, real: 0 };
-            let monthlyRPD = new Array(12).fill(0);
-            let monthlyReal = new Array(12).fill(0);
-
-            // Scan anak-anak langsung (Level + 1)
-            for (let j = i + 1; j < rowCount; j++) {
+            
+            // Cari semua baris di bawahnya yang merupakan Level + 1 (anak langsung)
+            for (let j = i + 1; j < rows.length; j++) {
                 const child = rows[j];
                 const childLv = parseInt(child.getAttribute('data-level')) || 0;
-
-                if (childLv <= level) break; // Keluar dari grup jika level kembali setara/kecil
-
+                
+                if (childLv <= level) break; // Berhenti jika bertemu baris dengan level sejajar atau lebih tinggi
+                
                 if (childLv === level + 1) {
-                    const c = child.cells;
-                    
-                    // Akumulasi Total
-                    sums.pagu   += getVal(c[3].textContent);
-                    sums.blokir += getVal(c[4].textContent);
-                    sums.rpd    += getVal(c[5].textContent);
-                    sums.real   += getVal(c[6].textContent);
-
-                    // Akumulasi Bulanan (Dataset)
-                    const cRPDArr = (child.dataset.rpdBulanan || "").split('|');
-                    const cRealArr = (child.dataset.realisasiBulanan || "").split('|');
-
-                    for (let m = 0; m < 12; m++) {
-                        monthlyRPD[m] += Number(cRPDArr[m]) || 0;
-                        monthlyReal[m] += Number(cRealArr[m]) || 0;
-                    }
+                    sums.pagu   += getVal(child.cells[3].textContent);
+                    sums.blokir += getVal(child.cells[4].textContent);
+                    sums.rpd    += getVal(child.cells[5].textContent);
+                    sums.real   += getVal(child.cells[6].textContent);
                 }
             }
-
-            // Update UI Induk
+            
+            // Update teks pada sel induk
             cells[3].textContent = toRp(sums.pagu);
             cells[4].textContent = toRp(sums.blokir);
             cells[5].textContent = toRp(sums.rpd);
             cells[6].textContent = toRp(sums.real);
-
-            // Simpan hasil akumulasi ke dataset induk
-            row.dataset.rpdBulanan = monthlyRPD.join('|');
-            row.dataset.realisasiBulanan = monthlyReal.join('|');
-            row.classList.add('is-parent');
-        } else {
-            row.classList.remove('is-parent');
         }
-
-        // Jalankan kalkulasi sisa/total (Pagu - Realisasi)
+        
+        // Hitung sisa pagu dan pewarnaan per baris
         calculateRowTotal(row);
     }
 
-    // Update Dashboard Monitor
+    // --- STEP 2: UPDATE DASHBOARD ---
+    // Sangat penting memanggil ini DI SINI agar Dashboard sinkron dengan hasil akumulasi tabel
     if (typeof updateDashboardTotal === 'function') {
         updateDashboardTotal();
     }
-}
+    // --- STEP 3: LOGIKA WARNA (Bandingkan Tabel vs Target Cloud) ---
+    const elPaguAll = document.getElementById('statTotalPaguAll');
+    const elBlokir = document.getElementById('statTotalBlokir');
 
+    let totalPaguTabel = 0;
+    let totalBlokirTabel = 0;
+    tableBody.querySelectorAll('tr[data-level="0"]').forEach(r => {
+        totalPaguTabel += getVal(r.cells[3].textContent);
+        totalBlokirTabel += getVal(r.cells[4].textContent);
+    });
+
+    const tPagu = getVal(targetPaguTotal);
+    const tBlokir = getVal(targetBlokirTotal);
+
+    if (elPaguAll) elPaguAll.style.color = (totalPaguTabel === tPagu && tPagu > 0) ? "#00ff00" : "#ff0000";
+    if (elBlokir) elBlokir.style.color = (totalBlokirTabel === tBlokir && tPagu > 0) ? "#00ff00" : "#ff0000";
+}
 // =====================================================================
 // 5. OPERASIONAL MODAL (EDIT, RPD, REALISASI)
 // =====================================================================
 
-// Helper Tutup Modal
 function closeAllModals() {
     editModal.style.display = 'none';
     rpdModal.style.display = 'none';
     realisasiModal.style.display = 'none';
-    // const selected = tableBody.querySelector('.row-checkbox:checked');
-    // if (selected) {
-    //     selected.checked = false;
-    //     selected.closest('tr').classList.remove('row-selected');
-    // }
 }
 
 // Pasang listener tutup ke semua tombol batal
@@ -272,9 +265,10 @@ document.querySelectorAll('.btn-close, .btn-batal, #btnCancelEdit, #btnCancelRPD
     btn.onclick = closeAllModals;
 });
 
-// --- A. MODAL EDIT DATA ---
+// =====================================================================
+// 6. MODAL EDIT DATA
+// =====================================================================
 document.getElementById('btnEdit').addEventListener('click', function() {
-    // KODE BARU (Cek jumlah yang dicentang)
     const selectedCbs = tableBody.querySelectorAll('.row-checkbox:checked');
 
     if (selectedCbs.length === 0) {
@@ -283,22 +277,20 @@ document.getElementById('btnEdit').addEventListener('click', function() {
     if (selectedCbs.length > 1) {
         return alert("Gagal: Anda memilih " + selectedCbs.length + " baris. Silakan pilih satu baris saja untuk fitur ini.");
     }
-    // Jika lolos validasi, definisikan 'selected' untuk dipakai kode di bawahnya
+
     const selected = selectedCbs[0];
     currentRowForEdit = selected.closest('tr');
-    const cells = currentRowForEdit.querySelectorAll('td');
+    const c = currentRowForEdit.cells;
     const level = parseInt(currentRowForEdit.getAttribute('data-level')) || 0;
 
-    // Load Data
-    document.getElementById('editKode').value = cells[1].innerText.replace('', '').trim();
-    document.getElementById('editNama').value = cells[2].innerText;
-    document.getElementById('editPagu').value = cells[3].innerText;
-    document.getElementById('editBlokir').value = cells[4].innerText;
+    document.getElementById('editKode').value = c[1].innerText.trim();
+    document.getElementById('editNama').value = c[2].innerText;
+    document.getElementById('editPagu').value = c[3].innerText;
+    document.getElementById('editBlokir').value = c[4].innerText;
 
-    // Proteksi: Level 0-3 (Induk) tidak bisa edit Pagu & Blokir
     const inputPagu = document.getElementById('editPagu');
     const inputBlokir = document.getElementById('editBlokir');
-    const isParent = (level < 4);
+    const isParent = level < 4;
 
     inputPagu.readOnly = isParent;
     inputBlokir.readOnly = isParent;
@@ -310,71 +302,54 @@ document.getElementById('btnEdit').addEventListener('click', function() {
 
 document.getElementById('btnUpdateData').onclick = function() {
     if (currentRowForEdit) {
-        // 1. Gunakan .cells (lebih cepat daripada querySelectorAll)
         const c = currentRowForEdit.cells;
         const level = parseInt(currentRowForEdit.getAttribute('data-level')) || 0;
-        const symbol = level > 0 ? '' : '';
-
-        // 2. Update Kode (Gunakan innerHTML karena ada struktur div/span)
         const kodeVal = document.getElementById('editKode').value;
+        const namaVal = document.getElementById('editNama').value;
+
         c[1].innerHTML = `
             <div style="display:flex; align-items:center;">
-                <span style="color:#808080; margin-right:5px">${symbol}</span>
+                <span style="color:#808080; margin-right:5px"></span>
                 <span>${kodeVal}</span>
             </div>`;
 
-        // 3. Update Nama (Gunakan textContent untuk keamanan)
-        c[2].textContent = document.getElementById('editNama').value;
+        c[2].textContent = namaVal;
         
-        // 4. Update Nilai (Hanya jika Level 4 / Bukan Induk)
         if (level === 4) {
-            // Pastikan nilai yang masuk ke tabel tetap terformat (misal: 1.000.000)
-            // agar getVal() nanti bisa memprosesnya dengan benar
-            c[3].textContent = document.getElementById('editPagu').value || "0";
-            c[4].textContent = document.getElementById('editBlokir').value || "0";
+            c[3].textContent = formatRibuan(document.getElementById('editPagu').value) || "0";
+            c[4].textContent = formatRibuan(document.getElementById('editBlokir').value) || "0";
         }
 
-        // 5. Finalisasi
         closeAllModals();
-        
-        // PENTING: Jalankan updateMondas agar perubahan di Level 4 
-        // langsung naik ke induk Level 3, 2, 1, dan 0
         updateMondas();
         
-        // Opsional: Tandai data telah berubah (jika menggunakan fitur dirty state)
         if (typeof markDirty === 'function') markDirty();
     }
 };
-
-// --- B. MODAL RPD (FIXED VALIDASI SINGLE SELECT) ---
+// =====================================================================
+// 7. MODAL RPD
+// =====================================================================
 document.getElementById('btnRPD').addEventListener('click', () => {
-    // 1. Ambil SEMUA checkbox yang dicentang
     const selectedCbs = tableBody.querySelectorAll('.row-checkbox:checked');
     
-    // 2. Validasi: Harus ada yang dipilih
     if (selectedCbs.length === 0) {
         return alert("Pilih satu baris untuk mengisi RPD!");
     }
     
-    // 3. Validasi: Tidak boleh lebih dari satu
     if (selectedCbs.length > 1) {
         return alert("Maaf, input RPD hanya bisa dilakukan satu per satu. Anda memilih " + selectedCbs.length + " baris.");
     }
 
-    // 4. Jika lolos, ambil baris pertama (index 0)
     const selected = selectedCbs[0];
     targetRowRPD = selected.closest('tr');
 
-    // ... sisa kode RPD Anda ke bawah (isParent, valPaguMurni, dll) tetap sama ...
-    targetRowRPD = selected.closest('tr');
-
-    const isParent = targetRowRPD.classList.contains('is-parent');
+    const level = parseInt(targetRowRPD.getAttribute('data-level')) || 0;
+    const isParent = level < 4;
     const btnSimpan = document.getElementById('btnUpdateRPD');
     const c = targetRowRPD.cells; 
     const inputs = rpdModal.querySelectorAll('.input-bulan');
     const valPaguMurni = getVal(c[3].textContent);
 
-    // 1. Fungsi Update Info Bar (Hanya merubah tampilan modal, bukan tabel utama)
     const updateRPDInfoBar = () => {
         let totalRPD = 0;
         inputs.forEach(i => totalRPD += getVal(i.value));
@@ -394,77 +369,73 @@ document.getElementById('btnRPD').addEventListener('click', () => {
         if (totalInput) totalInput.value = toRp(totalRPD);
     };
 
-    // 2. Load Data Awal ke Input Modal
-    const savedData = (targetRowRPD.dataset.rpdBulanan || "0|0|0|0|0|0|0|0|0|0|0|0").split('|');
+    let savedRaw = targetRowRPD.dataset.rpdBulanan;
+    let savedData = [];
+    
+    try {
+        if (savedRaw && savedRaw.startsWith('[')) {
+            savedData = JSON.parse(savedRaw);
+        } else if (savedRaw && savedRaw.includes('|')) {
+            savedData = savedRaw.split('|').map(Number);
+        } else {
+            savedData = new Array(12).fill(0);
+        }
+    } catch (e) {
+        savedData = new Array(12).fill(0);
+    }
     
     inputs.forEach((inp, idx) => {
-        let valMurni = savedData[idx] || "0";
-        inp.value = (valMurni === "0" || valMurni === "") ? "" : formatRibuan(valMurni);
+        let valMurni = savedData[idx] || 0;
+        inp.value = valMurni === 0 ? "" : formatRibuan(valMurni);
         
         inp.readOnly = isParent;
-        inp.style.backgroundColor = isParent ? "#2d2d2d" : "#ffffff"; 
+        inp.style.backgroundColor = isParent ? "#f0f0f0" : "#ffffff"; 
         inp.style.cursor = isParent ? "not-allowed" : "text";
 
-        // Logic Input: Hanya update visual modal
         inp.oninput = function() {
             this.value = formatRibuan(this.value);
             updateRPDInfoBar(); 
-            // DEBOUNCE AUTO-SAVE DIHAPUS AGAR TIDAK TERUPDATE KE TABEL SEBELUM DISIMPAN
         };
     });
 
-    // 3. Kontrol Tombol Simpan (Proses Penulisan ke Tabel dilakukan di sini)
     if (btnSimpan) {
         btnSimpan.style.display = isParent ? "none" : "block";
         
-        // Gunakan onclick eksplisit untuk memastikan data lama tidak terbawa
-        btnSimpan.onclick = () => {
-            // A. Ambil data dari input modal
-            const murniArr = Array.from(inputs).map(i => i.value.replace(/\D/g, "") || "0");
-            const totalBaru = murniArr.reduce((acc, curr) => acc + parseInt(curr), 0);
+       
+            btnSimpan.onclick = () => {
+            const murniArr = Array.from(inputs).map(i => getVal(i.value));
+            const totalRPD = murniArr.reduce((acc, curr) => acc + curr, 0);
 
-            // B. Simpan ke dataset baris tabel
-            targetRowRPD.dataset.rpdBulanan = murniArr.join('|');
+            // Simpan ke dataset
+            targetRowRPD.dataset.rpdBulanan = JSON.stringify(murniArr);
+            // Update teks kolom RPD (Index 5)
+            targetRowRPD.cells[5].textContent = toRp(totalRPD);
             
-            // C. Update tampilan kolom RPD di tabel utama (Index 5)
-            c[5].textContent = toRp(totalBaru);
-            
-            // D. Jalankan rekalkulasi hirarki
-            updateMondas(); 
-            updateDashboardTotal();
-            
+            updateMondas(); // Ini akan memicu updateDashboardTotal()
             closeAllModals();
         };
     }
 
-    // 4. Inisialisasi tampilan modal
     updateRPDInfoBar();
     rpdModal.style.display = 'flex';
 });
-// --- C. MODAL REALISASI (FIXED: NO AUTO-SAVE ON CANCEL) ---
+// =====================================================================
+// 8. MODAL REALISASI
+// =====================================================================
 document.getElementById('btnRealisasi').addEventListener('click', () => {
-  // Cek semua baris yang tercentang
     const selectedCbs = tableBody.querySelectorAll('.row-checkbox:checked');
     
-    // Validasi: Harus ada dan hanya boleh satu
     if (selectedCbs.length === 0) return alert("Pilih satu baris!");
     if (selectedCbs.length > 1) return alert(`Pilih hanya satu baris (Anda memilih ${selectedCbs.length})`);
     
-    // Jika valid, ambil baris tersebut
     const targetRowRealisasi = selectedCbs[0].closest('tr');
-    
-    const isParent = targetRowRealisasi.classList.contains('is-parent');
+    const level = parseInt(targetRowRealisasi.getAttribute('data-level')) || 0;
+    const isParent = level < 4;
     const btnSimpan = document.getElementById('btnUpdateRealisasi');
     const c = targetRowRealisasi.cells; 
     const inputs = realisasiModal.querySelectorAll('.input-realisasi');
-    // 1. Ambil nilai RPD sebagai acuan plafon realisasi (Kolom index 5)
     const valRPD = getVal(c[5].textContent);
 
-    // 2. Load Data Dataset
-    const dataRPD = (targetRowRealisasi.dataset.rpdBulanan || "0|0|0|0|0|0|0|0|0|0|0|0").split('|');
-    const savedReal = (targetRowRealisasi.dataset.realisasiBulanan || "0|0|0|0|0|0|0|0|0|0|0|0").split('|');
-
-    // 3. Fungsi Update Info Bar Modal (Hanya Visual Modal)
     const updateRealInfoBar = () => {
         let totalReal = 0;
         inputs.forEach(i => totalReal += getVal(i.value));
@@ -484,52 +455,54 @@ document.getElementById('btnRealisasi').addEventListener('click', () => {
         if (totalInput) totalInput.value = toRp(totalReal);
     };
 
-    // 4. Inisialisasi Input & Event Listener
+    const getSafeData = (row, key) => {
+        let d = row.dataset[key];
+        if (!d) return new Array(12).fill(0);
+        try {
+            if (typeof d === 'string') {
+                if (d.startsWith('[')) return JSON.parse(d);
+                if (d.includes('|')) return d.split('|').map(Number);
+            }
+            return Array.isArray(d) ? d : new Array(12).fill(0);
+        } catch (e) { return new Array(12).fill(0); }
+    };
+
+    const dataRPD = getSafeData(targetRowRealisasi, 'rpdBulanan');
+    const savedReal = getSafeData(targetRowRealisasi, 'realisasiBulanan');
+
     inputs.forEach((inp, idx) => {
-        // Placeholder dari RPD bulan tersebut
-        let valPlaceholder = dataRPD[idx] || "0";
-        inp.placeholder = valPlaceholder !== "0" ? formatRibuan(valPlaceholder) : "0";
+        let valPlaceholder = dataRPD[idx] || 0;
+        inp.placeholder = valPlaceholder !== 0 ? formatRibuan(valPlaceholder) : "0";
         
-        // Nilai awal dari dataset Realisasi
-        let valAwal = savedReal[idx] || "0";
-        inp.value = (valAwal !== "0" && valAwal !== "") ? formatRibuan(valAwal) : "";
+        let valAwal = savedReal[idx] || 0;
+        inp.value = valAwal !== 0 ? formatRibuan(valAwal) : "";
         
-        // Proteksi jika baris induk
         inp.readOnly = isParent;
         inp.style.backgroundColor = isParent ? "#f0f0f0" : "#ffffff";
         inp.style.cursor = isParent ? "not-allowed" : "text";
 
-        // Logic Input: Hanya update visual modal
         inp.oninput = function() {
             this.value = formatRibuan(this.value);
             updateRealInfoBar(); 
-            // AUTO-SAVE (DEBOUNCE) DIHAPUS AGAR DATA TIDAK MASUK SAAT CANCEL
         };
     });
 
-    // 5. Kontrol Tombol Simpan (Penyimpanan dilakukan HANYA di sini)
     if (btnSimpan) {
         btnSimpan.style.display = isParent ? "none" : "block";
+        // Cari bagian btnSimpan.onclick di dalam btnRealisasi listener
         btnSimpan.onclick = function() {
-            // A. Ambil angka murni dari input modal
-            const murniArr = Array.from(inputs).map(i => i.value.replace(/\D/g, "") || "0");
-            const totalBaru = murniArr.reduce((acc, curr) => acc + parseInt(curr), 0);
+            const murniArr = Array.from(inputs).map(i => getVal(i.value));
+            const totalReal = murniArr.reduce((acc, curr) => acc + curr, 0);
 
-            // B. Simpan ke dataset baris tabel
-            targetRowRealisasi.dataset.realisasiBulanan = murniArr.join('|');
+            targetRowRealisasi.dataset.realisasiBulanan = JSON.stringify(murniArr);
+            // Update teks kolom Realisasi (Index 6)
+            targetRowRealisasi.cells[6].textContent = toRp(totalReal);
             
-            // C. Update kolom Realisasi di tabel utama (Index 6)
-            c[6].textContent = toRp(totalBaru);
-            
-            // D. Jalankan Rekalkulasi Hirarki & Dashboard
             updateMondas(); 
-            updateDashboardTotal();
-            
             closeAllModals();
         };
     }
 
-    // Tampilkan modal
     updateRealInfoBar();
     realisasiModal.style.display = 'flex';
 });
@@ -539,106 +512,131 @@ document.getElementById('btnRealisasi').addEventListener('click', () => {
 document.getElementById('btnSave').addEventListener('click', async () => {
     const btn = document.getElementById('btnSave');
     const originalText = btn.innerText;
-    
-    // 1. UI Feedback & Validasi
     btn.innerText = "SAVING...";
     btn.disabled = true;
 
     try {
-        // 2. Ekstraksi Data (Sangat Efisien)
         const rowsToSave = Array.from(tableBody.rows).map((row, index) => {
             const c = row.cells;
+            
+            const getArr = (key) => {
+                let d = row.dataset[key];
+                if (!d) return new Array(12).fill(0);
+                
+                try {
+                    // Jika data berupa string JSON (disarankan)
+                    if (typeof d === 'string' && d.startsWith('[')) {
+                        return JSON.parse(d).map(Number);
+                    } 
+                    // Jika data berupa format lama Pipe |
+                    if (typeof d === 'string' && d.includes('|')) {
+                        return d.split('|').map(Number);
+                    }
+                    // Jika data sudah berupa Array objek
+                    if (Array.isArray(d)) return d.map(Number);
+                    
+                    return new Array(12).fill(0);
+                } catch (e) {
+                    return new Array(12).fill(0);
+                }
+            };
+
             return {
                 sort_order: index,
                 level: parseInt(row.getAttribute('data-level')) || 0,
-                rpd_bulanan: row.dataset.rpdBulanan || "0|0|0|0|0|0|0|0|0|0|0|0",
-                real_bulanan: row.dataset.realisasiBulanan || "0|0|0|0|0|0|0|0|0|0|0|0",
-                kode: c[1].textContent.trim(),
-                nama: c[2].textContent.trim(),
+                kode: c[1].innerText.trim(),
+                nama: c[2].innerText.trim(),
                 pagu: getVal(c[3].textContent),
                 blokir: getVal(c[4].textContent),
                 rpd_total: getVal(c[5].textContent),
-                real_total: getVal(c[6].textContent)
+                real_total: getVal(c[6].textContent),
+                rpd_bulanan: getArr('rpdBulanan'),
+                real_bulanan: getArr('realisasiBulanan')
             };
         });
 
-        if (rowsToSave.length === 0) throw new Error("Tidak ada data untuk disimpan.");
+        if (rowsToSave.length === 0) throw new Error("Tabel kosong!");
 
-        // 3. Eksekusi Supabase
-        // Strategi: Hapus semua data berdasarkan range sort_order agar lebih universal
-        const { error: deleteError } = await _supabase
-            .from('anggaran')
-            .delete()
-            .gt('sort_order', -1); // Menghapus semua yang indexnya >= 0
+        // Hapus data lama dan masukkan data baru
+        await _supabase.from('anggaran').delete().neq('level', -1);
+        const { error: insError } = await _supabase.from('anggaran').insert(rowsToSave);
+        if (insError) throw insError;
 
-        if (deleteError) throw deleteError;
-
-        // Insert Bulk (Supabase otomatis menangani batching jika data besar)
-        const { error: insertError } = await _supabase
-            .from('anggaran')
-            .insert(rowsToSave);
-
-        if (insertError) throw insertError;
-
-        // 4. Sukses
-        alert("✅ Data Berhasil Disinkronkan ke Cloud.");
-
+        alert("✅ Data Berhasil Disimpan Permanen!");
     } catch (err) {
-        console.error("Save Error:", err);
-        alert(`❌ Gagal menyimpan: ${err.message || "Terjadi kesalahan koneksi"}`);
+        console.error(err);
+        alert("❌ Gagal Simpan: " + err.message);
     } finally {
-        // 5. Kembalikan State UI
         btn.innerText = originalText;
         btn.disabled = false;
     }
 });
 async function loadDataFromSupabase() {
-    tableBody.innerHTML = "<tr><td colspan='9' class='text-center'>Memuat data dari server...</td></tr>";
+    tableBody.innerHTML = "<tr><td colspan='9' class='text-center'>Memuat data...</td></tr>";
 
-    const { data, error } = await _supabase
-        .from('anggaran')
-        .select('*')
-        .order('sort_order', { ascending: true });
+    try {
+        // AMBIL DATA TARGET DARI CLOUD TERLEBIH DAHULU
+        const { data: configData, error: configError } = await _supabase
+            .from('config')
+            .select('pagu_target, blokir_target')
+            .eq('id', 'global_target')
+            .single();
 
-    if (error) {
-        alert("Gagal memuat data dari Cloud!");
-        return;
+        if (!configError && configData) {
+            targetPaguTotal = configData.pagu_target;
+            targetBlokirTotal = configData.blokir_target;
+        }
+
+        // AMBIL DATA ANGGARAN
+        const { data, error } = await _supabase.from('anggaran').select('*').order('sort_order', { ascending: true });
+        if (error) throw error;
+
+        tableBody.innerHTML = ""; 
+        if (!data || data.length === 0) return;
+
+        data.forEach(item => {
+    const row = document.createElement('tr');
+    row.setAttribute('data-level', item.level);
+    
+    // Dataset harus dalam format string JSON untuk operasional modal nanti
+    row.dataset.rpdBulanan = Array.isArray(item.rpd_bulanan) ? JSON.stringify(item.rpd_bulanan) : JSON.stringify(new Array(12).fill(0));
+    row.dataset.realisasiBulanan = Array.isArray(item.real_bulanan) ? JSON.stringify(item.real_bulanan) : JSON.stringify(new Array(12).fill(0));
+    
+    const pagu      = item.pagu || 0;
+    const blokir    = item.blokir || 0;
+    const rpd       = item.rpd_total || 0;
+    const realisasi = item.real_total || 0;
+    const sisa      = pagu - realisasi;
+
+    row.innerHTML = `
+        <td class="col-cb text-center"><input type="checkbox" class="row-checkbox"></td>
+        <td class="col-kd" style="padding-left:${item.level * 15}px !important">
+            <span>${item.kode || ''}</span>
+        </td>
+        <td class="col-nm">${item.nama || ''}</td>
+        <td class="col-idr text-right">${toRp(pagu)}</td>      <td class="col-idr text-right">${toRp(blokir)}</td>    <td class="col-idr text-right">${toRp(rpd)}</td>       <td class="col-idr text-right">${toRp(realisasi)}</td> <td class="col-idr text-right">${toRp(realisasi)}</td> <td class="col-idr text-right" style="${sisa < 0 ? 'color:red;font-weight:bold;' : ''}">${toRp(sisa)}</td> `;
+    tableBody.appendChild(row);
+});
+
+// ... (di dalam try block setelah loop tableBody.appendChild)
+        
+        // 1. Jalankan perhitungan hierarki
+        updateMondas(); 
+
+        // 2. Paksa update dashboard setelah sedikit jeda agar DOM selesai dirender
+        setTimeout(() => {
+            console.log("Memulai Update Dashboard dari Load Data...");
+            updateDashboardTotal();
+        }, 200);
+
+    } catch (err) {
+        console.error("Error loading data:", err);
+        tableBody.innerHTML = "<tr><td colspan='9' class='text-center text-danger'>Gagal memuat: " + err.message + "</td></tr>";
     }
-
-    tableBody.innerHTML = ""; 
-    if (!data || data.length === 0) return;
-
-    data.forEach(item => {
-        const row = document.createElement('tr');
-        row.setAttribute('data-level', item.level);
-        row.dataset.rpdBulanan = item.rpd_bulanan;
-        row.dataset.realisasiBulanan = item.real_bulanan;
-        
-        const padding = item.level * 15;
-        
-        row.innerHTML = `
-            <td class="col-cb text-center"><input type="checkbox" class="row-checkbox"></td>
-            <td class="col-kd" style="padding-left:${padding}px!important">
-                <div style="display:flex;align-items:center;">
-                    <span style="color:#808080;font-family:monospace;margin-right:5px"></span>
-                    <span>${item.kode}</span>
-                </div>
-            </td>
-            <td class="col-nm">${item.nama}</td>
-            <td class="col-idr text-right">${toRp(item.pagu)}</td>
-            <td class="col-idr text-right">${toRp(item.blokir)}</td>
-            <td class="col-idr text-right">${toRp(item.rpd_total)}</td>
-            <td class="col-idr text-right">${toRp(item.real_total)}</td>
-            <td class="col-idr text-right">0</td>
-            <td class="col-idr text-right">0</td>
-        `;
-        tableBody.appendChild(row);
-    });
-
-    updateMondas();
-    updateDashboardTotal();
 }
-// ====================== HAPUS BARIS =========================
+// =====================================================================
+// 7. HAPUS BARIS
+// =====================================================================
 document.getElementById('btnDelete').addEventListener('click', () => {
     // Ambil semua baris yang tercentang
     const selectedCbs = tableBody.querySelectorAll('.row-checkbox:checked');
@@ -652,59 +650,46 @@ document.getElementById('btnDelete').addEventListener('click', () => {
     if (confirm(confirmMsg)) {
         selectedCbs.forEach(cb => {
             const row = cb.closest('tr');
-            if (!row) return; // Guard clause jika baris sudah terhapus oleh parent-nya
+            if (!row) return;
 
             const level = parseInt(row.getAttribute('data-level')) || 0;
             
-            // Logika Hapus Cabang (Anak-anaknya):
             let nextRow = row.nextElementSibling;
             while (nextRow && (parseInt(nextRow.getAttribute('data-level')) || 0) > level) {
                 let toDelete = nextRow;
                 nextRow = nextRow.nextElementSibling;
                 toDelete.remove();
             }
-
-            // Hapus baris induk/dirinya sendiri
             row.remove();
         });
 
-        // 1. Reset checkbox master (Sesuaikan ID-nya)
         const masterCb = document.getElementById('checkAllMaster');
         if (masterCb) masterCb.checked = false;
 
-        // 2. KUNCI REALTIME: Jalankan urutan update
-        // Hitung ulang hirarki dulu (Level 4 ke Level 0)
         if (typeof updateMondas === 'function') {
             updateMondas(); 
         }
-
-        // 3. Update Dashboard Monitor (Con1) berdasarkan hasil Level 0 terbaru
         if (typeof updateDashboardTotal === 'function') {
             updateDashboardTotal();
         }
-        
-        // alert("Data berhasil dihapus dan dashboard diperbarui.");
     }
 });
-// ========== CEKLIST ALL ===========
-// Menggunakan ID checkAllMaster sesuai HTML Anda
+// =====================================================================
+// 8. CEKLIST ALL
+// =====================================================================
 const checkAllMaster = document.getElementById('checkAllMaster');
 
 checkAllMaster.addEventListener('change', function() {
-    // Ambil semua checkbox baris yang ada di dalam tableBody
-    // Pastikan checkbox di tiap baris memiliki class 'row-checkbox'
     const checkboxes = tableBody.querySelectorAll('.row-checkbox');
     
     checkboxes.forEach(cb => {
         const row = cb.closest('tr');
-        // Hanya centang baris yang tidak disembunyikan (fitur search/filter)
         if (row.style.display !== 'none') {
             cb.checked = this.checked;
         }
     });
 });
 
-// Pasang listener di tableBody agar efisien (Event Delegation)
 tableBody.addEventListener('change', (e) => {
     if (e.target.classList.contains('row-checkbox')) {
         const row = e.target.closest('tr');
@@ -716,7 +701,6 @@ tableBody.addEventListener('change', (e) => {
     }
 });
 
-// Update juga fungsi master checkbox agar semua baris berubah warna
 checkAllMaster.addEventListener('change', function() {
     const checkboxes = tableBody.querySelectorAll('.row-checkbox');
     checkboxes.forEach(cb => {
@@ -728,100 +712,43 @@ checkAllMaster.addEventListener('change', function() {
         }
     });
 });
-// =========== TOTAL DAS1 ===============
+// =====================================================================
+// 9. TOTAL DAS1
+// =====================================================================
 function updateDashboardTotal() {
-    // 1. Ambil baris Level 0 (Grand Total)
-    const topLevelRows = tableBody.querySelectorAll('tr[data-level="0"]');
-    
-    let totals = { 
-        paguBersih: 0, // Nilai yang ada di kolom Pagu
-        paguTotal: 0,  // Pagu + Blokir
-        blokir: 0, 
-        rpd: 0, 
-        real: 0 
-    };
+    const topRows = tableBody.querySelectorAll('tr[data-level="0"]');
+    let totals = { pagu: 0, blokir: 0, rpd: 0, real: 0 };
 
-    // 2. Kalkulasi Batch
-    topLevelRows.forEach(row => {
-        const c = row.cells; 
-        if (c.length > 6) {
-            const p = getVal(c[3].textContent); // Nilai kolom Pagu
-            const b = getVal(c[4].textContent); // Nilai kolom Blokir
-            
-            totals.paguBersih += p;
-            totals.blokir     += b;
-            totals.paguTotal  += (p + b); // Pagu Tanpa Blokir + Pagu Blokir
-            
-            totals.rpd        += getVal(c[5].textContent);
-            totals.real       += getVal(c[6].textContent);
+    topRows.forEach(row => {
+        const c = row.cells;
+        if (c.length >= 7) {
+            totals.pagu   += getVal(c[3].textContent);
+            totals.blokir += getVal(c[4].textContent);
+            totals.rpd    += getVal(c[5].textContent); 
+            totals.real   += getVal(c[6].textContent);
         }
     });
 
-    const prsTotal = totals.rpd > 0 ? (totals.real / totals.rpd * 100) : 0;
+    // 1. Hitung Pagu Tanpa Blokir
+    const paguNetto = totals.pagu - totals.blokir;
 
-    // 3. Render ke DOM
-    const elements = {
-        'statTotalPaguAll': toRp(totals.paguTotal),  // ID baru Anda
-        'statTotalPagu': toRp(totals.paguBersih),    // Pagu yang sudah dikurangi blokir
-        'statTotalBlokir': toRp(totals.blokir),
-        'statTotalRPD': toRp(totals.rpd),
-        'statTotalRealisasi': toRp(totals.real),
-        'dashPersen': prsTotal.toFixed(2) + "%"
-    };
+    // 2. Mapping ID sesuai HTML Anda
+    const elPaguNetto = document.getElementById('statTotalPagu'); // Box: PAGU TANPA BLOKIR
+    const elRPD       = document.getElementById('statTotalRPD');  // Box: TOTAL RPD
+    const elPaguAll   = document.getElementById('statTotalPaguAll'); // Box: TOTAL PAGU (Jika ada)
+    const elBlokir    = document.getElementById('statTotalBlokir');
+    const elReal      = document.getElementById('statTotalRealisasi');
 
-    for (const [id, value] of Object.entries(elements)) {
-        const el = document.getElementById(id);
-        if (el) {
-            if (el.textContent !== value) {
-                el.textContent = value;
-                if (id === 'dashPersen') {
-                    el.style.color = (prsTotal > 0) ? "#0f0" : "#fff";
-                }
-            }
-        }
-    }
+    // 3. Update Tampilan
+    if (elPaguNetto) elPaguNetto.textContent = toRp(paguNetto);
+    if (elRPD)       elRPD.textContent = toRp(totals.rpd);
+    if (elBlokir)    elBlokir.textContent = toRp(totals.blokir);
+    if (elReal)      elReal.textContent = toRp(totals.real);
+    if (elPaguAll)   elPaguAll.textContent = toRp(totals.pagu);
 }
-document.addEventListener('DOMContentLoaded', () => {
-    // 1. Inisialisasi Load Data
-    if (typeof loadDataFromSupabase === 'function') {
-        loadDataFromSupabase();
-    }
-
-    // 2. Pencarian Ringan dengan Debounce
-    const searchInput = document.getElementById('tableSearch');
-    let searchTimer; // Variabel untuk menampung jeda waktu
-
-    if (searchInput) {
-        searchInput.addEventListener('input', function() {
-            const filter = this.value.toUpperCase().trim();
-            
-            // Hapus timer sebelumnya (mencegah proses bertumpuk saat mengetik cepat)
-            clearTimeout(searchTimer);
-
-            // Jalankan pencarian HANYA setelah berhenti mengetik selama 300ms
-            searchTimer = setTimeout(() => {
-                const rows = document.querySelectorAll('#tableBody tr');
-                
-                // Gunakan requestAnimationFrame agar render lebih smooth bagi browser
-                window.requestAnimationFrame(() => {
-                    rows.forEach(row => {
-                        const cellKode = row.cells[1] ? row.cells[1].innerText.toUpperCase() : "";
-                        const cellNama = row.cells[2] ? row.cells[2].innerText.toUpperCase() : "";
-
-                        if (filter === "" || cellKode.includes(filter) || cellNama.includes(filter)) {
-                            row.style.display = ""; 
-                        } else {
-                            row.style.display = "none"; 
-                        }
-                    });
-                });
-                console.log("Pencarian dijalankan untuk: " + filter);
-            }, 300); 
-        });
-    }
-});
-
-// =========== DASBOARD ===============
+// =====================================================================
+// 10. DASBOARD
+// =====================================================================
 document.getElementById('btnDasboard').onclick = function() {
     document.getElementById('dashboardOverlay').style.display = 'flex';
     updateDashboardStats("TAHUNAN");
@@ -835,7 +762,6 @@ document.getElementById('dashPeriodSelect').onchange = function() {
     updateDashboardStats(this.value);
 };
 
-// =========== DASHBOARD FIX VERSION (FINAL) ===============
 function updateDashboardStats(period) {
     const rows = document.querySelectorAll('#tableBody tr');
     
@@ -978,8 +904,8 @@ window.addEventListener('beforeunload', (e) => {
 
 // Reset status dirty saat berhasil save
 // (Tambahkan ini di dalam blok 'try' pada fungsi btnSave setelah alert sukses)
-isDirty = false;
-btn.style.backgroundColor = ""; // Reset warna tombol
+// isDirty = false;
+// btn.style.backgroundColor = ""; // Reset warna tombol
 
 // ======= KOLOM PENCARIAN ===========
 document.getElementById('tableSearch').addEventListener('input', function() {
@@ -998,113 +924,64 @@ document.getElementById('tableSearch').addEventListener('input', function() {
         }
     });
 });
-// ============== PDF GENERATOR (ULTIMATE FIX) ====================
-document.getElementById('btnPDF').onclick = function () {
+// =====================================================================
+// LOGIKA MODAL INPUT (SINKRON DENGAN HTML MODAL)
+// =====================================================================
+const inputModal = document.getElementById('inputModal');
+
+document.getElementById('btnInput').addEventListener('click', () => {
+    document.getElementById('inputPagu').value = targetPaguTotal > 0 ? formatRibuan(targetPaguTotal.toString()) : "";
+    document.getElementById('inputBlokir').value = targetBlokirTotal > 0 ? formatRibuan(targetBlokirTotal.toString()) : "";
+    
+    inputModal.style.display = 'flex';
+    setTimeout(() => { document.getElementById('inputPagu').focus(); }, 100);
+});
+
+document.getElementById('btnCancelInput').onclick = () => inputModal.style.display = 'none';
+document.getElementById('btnCloseInput').onclick = () => inputModal.style.display = 'none';
+
+['inputPagu', 'inputBlokir'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+        el.addEventListener('input', function() { 
+            this.value = formatRibuan(this.value.replace(/[^0-9]/g, '')); 
+        });
+    }
+});
+
+document.getElementById('btnSubmitInput').onclick = async function() {
+    const btn = this;
+    const originalText = btn.innerText;
+    
+    const newPagu = getVal(document.getElementById('inputPagu').value);
+    const newBlokir = getVal(document.getElementById('inputBlokir').value);
+
+    btn.disabled = true;
+    btn.innerText = "SAVING...";
+
     try {
-        // 1. Cek Namespace jsPDF (Mendukung berbagai cara load library)
-        const { jsPDF } = window.jspdf || window; 
-        
-        if (!jsPDF) {
-            alert("Error: Library jsPDF tidak ditemukan. Pastikan CDN sudah terpasang di HTML.");
-            return;
-        }
+        const { error } = await _supabase
+            .from('config')
+            .update({ pagu_target: newPagu, blokir_target: newBlokir })
+            .eq('id', 'global_target');
 
-        // 2. Inisialisasi Document (Landscape, Unit mm, Ukuran A4)
-        const doc = new jsPDF({
-            orientation: 'landscape',
-            unit: 'mm',
-            format: 'a4'
-        });
+        if (error) throw error;
 
-        // 3. Ambil Data dari TableBody
-        const tableBody = document.getElementById('tableBody');
-        const rows = Array.from(tableBody.querySelectorAll('tr'));
-        
-        // Hanya ambil baris yang terlihat (tidak kena filter search)
-        const visibleRows = rows.filter(row => row.style.display !== 'none');
+        targetPaguTotal = newPagu;
+        targetBlokirTotal = newBlokir;
 
-        if (visibleRows.length === 0) {
-            alert("Tabel kosong, tidak ada data untuk diekspor.");
-            return;
-        }
-
-        // 4. Mapping Data dengan Indentasi Hirarki
-        const bodyData = visibleRows.map(row => {
-            const c = row.cells;
-            const level = parseInt(row.getAttribute('data-level')) || 0;
-            
-            // Indentasi untuk Nama (Kolom 2)
-            const prefix = "   ".repeat(level); 
-
-            return [
-                c[1] ? c[1].innerText.trim() : '',              // KODE
-                c[2] ? prefix + c[2].innerText.trim() : '',      // NAMA
-                c[3] ? c[3].innerText.trim() : '0',              // PAGU
-                c[4] ? c[4].innerText.trim() : '0',              // BLOKIR
-                c[5] ? c[5].innerText.trim() : '0',              // RPD
-                c[6] ? c[6].innerText.trim() : '0',              // REALISASI
-                c[7] ? c[7].innerText.trim() : '0',              // TOTAL
-                c[8] ? c[8].innerText.trim() : '0'               // SISA
-            ];
-        });
-
-        // 5. Header Laporan
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(14);
-        doc.text("LAPORAN MONITORING REALISASI ANGGARAN", 14, 15);
-        
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(9);
-        doc.text(`Dicetak pada: ${new Date().toLocaleString('id-ID')}`, 14, 22);
-
-        // 6. Eksekusi AutoTable (PENTING: Pastikan plugin autotable sudah load)
-        if (typeof doc.autoTable !== 'function') {
-            alert("Error: Plugin AutoTable tidak ditemukan. Tambahkan: <script src='https://unpkg.com/jspdf-autotable'></script>");
-            return;
-        }
-
-        doc.autoTable({
-            startY: 28,
-            head: [['KODE', 'NAMA PROGRAM / KEGIATAN', 'PAGU', 'BLOKIR', 'RPD', 'REALISASI', 'TOTAL', 'SISA']],
-            body: bodyData,
-            theme: 'grid',
-            styles: { fontSize: 7, cellPadding: 2 },
-            headStyles: { fillColor: [41, 128, 185], textColor: 255, halign: 'center' },
-            columnStyles: {
-                0: { cellWidth: 20 },
-                1: { cellWidth: 'auto' },
-                2: { halign: 'right' },
-                3: { halign: 'right' },
-                4: { halign: 'right' },
-                5: { halign: 'right' },
-                6: { halign: 'right' },
-                7: { halign: 'right' }
-            },
-            didParseCell: function(data) {
-                // Mewarnai baris induk (Level 0)
-                if (data.section === 'body') {
-                    const level0 = !data.row.cells[1].raw.startsWith("   ");
-                    if (level0) {
-                        data.cell.styles.fontStyle = 'bold';
-                        data.cell.styles.fillColor = [240, 240, 240];
-                    }
-                }
-                
-                // Mewarnai teks merah jika sisa negatif di kolom indeks 7
-                if (data.column.index === 7 && data.section === 'body') {
-                    const valStr = data.cell.raw.toString().replace(/\./g, '');
-                    if (parseInt(valStr) < 0) {
-                        data.cell.styles.textColor = [200, 0, 0];
-                    }
-                }
-            }
-        });
-
-        // 7. Download PDF
-        doc.save(`Laporan_Anggaran_${Date.now()}.pdf`);
-
+        updateMondas(); 
+        document.getElementById('inputModal').style.display = 'none';
+        // alert("✅ Target berhasil diperbarui!");
     } catch (err) {
-        console.error("PDF Error:", err);
-        alert("Gagal membuat PDF. Cek Console (F12) untuk detail.");
+        // alert("❌ Gagal simpan: " + err.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerText = originalText;
     }
 };
+
+document.addEventListener('DOMContentLoaded', () => {
+    initMoneyInputs();
+    loadDataFromSupabase();
+});
