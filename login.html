@@ -202,49 +202,64 @@
     </div>
 
     <script>
-        // --- KONFIGURASI SUPABASE ---
-        const SUPABASE_URL = 'https://ldkefnlnpgwgxznemzol.supabase.co';
-        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxka2VmbmxucGd3Z3h6bmVtem9sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwODE5NDYsImV4cCI6MjA4NzY1Nzk0Nn0.aRvd4POq_HdTdYVAU-Nl-RFNjeqgPjbNteRYyDdUIvE';
-        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    // 1. PASTIKAN KEY DI BAWAH INI ADALAH KEY LENGKAP (TIDAK ADA TITIK-TITIK)
+    const SUPABASE_URL = 'https://ldkefnlnpgwgxznemzol.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxka2VmbmxucGd3Z3h6bmVtem9sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwODE5NDYsImV4cCI6MjA4NzY1Nzk0Nn0.aRvd4POq_HdTdYVAU-Nl-RFNjeqgPjbNteRYyDdUIvE'; 
+    
+    // Gunakan nama variabel yang berbeda agar tidak bentrok dengan script.js nanti
+    const authClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        const loginForm = document.getElementById('loginForm');
-        const loginWin = document.getElementById('loginWin');
-        const statusMsg = document.getElementById('statusMsg');
+    const loginForm = document.getElementById('loginForm');
+    const loginWin = document.getElementById('loginWin');
+    const statusMsg = document.getElementById('statusMsg');
 
+    if (loginForm) {
         loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
+            
+            const submitBtn = loginForm.querySelector('button[type="submit"]');
+            if (submitBtn) submitBtn.disabled = true;
+
             statusMsg.innerText = "Status: Memeriksa database...";
             
-            const email = document.getElementById('email').value;
+            const email = document.getElementById('email').value.trim();
             const password = document.getElementById('password').value;
 
-            const { data, error } = await supabaseClient.auth.signInWithPassword({
-                email: email,
-                password: password,
-            });
+            try {
+                const { data, error } = await authClient.auth.signInWithPassword({
+                    email: email,
+                    password: password,
+                });
 
-            if (error) {
+                if (error) {
+                    throw error;
+                } else {
+                    statusMsg.innerText = "Status: Akses Diterima!";
+                    loginWin.style.opacity = '0.5';
+                    window.location.replace('index.html');
+                }
+            } catch (error) {
                 loginWin.classList.add('error-shake');
                 statusMsg.innerText = "Status: Kesalahan login.";
+                if (submitBtn) submitBtn.disabled = false;
+                
                 setTimeout(() => loginWin.classList.remove('error-shake'), 400);
                 alert("Akses Ditolak: " + error.message);
-            } else {
-                statusMsg.innerText = "Status: Akses Diterima!";
-                // Efek fade out sebelum pindah halaman
-                loginWin.style.opacity = '0.5';
-                window.location.href = 'index.html';
             }
         });
+    }
 
-        // Jam Real-time
-        function startTime() {
-            const today = new Date();
-            let h = today.getHours(); let m = today.getMinutes();
-            m = m < 10 ? "0" + m : m;
-            document.getElementById('clock').innerHTML = h + ":" + m;
-            setTimeout(startTime, 1000);
-        }
-        startTime();
-    </script>
+    function startTime() {
+        const today = new Date();
+        let h = today.getHours(); 
+        let m = today.getMinutes();
+        h = h < 10 ? "0" + h : h;
+        m = m < 10 ? "0" + m : m;
+        const clockEl = document.getElementById('clock');
+        if (clockEl) clockEl.innerHTML = h + ":" + m;
+        setTimeout(startTime, 1000);
+    }
+    startTime();
+</script>
 </body>
 </html>
