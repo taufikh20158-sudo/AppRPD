@@ -1,10 +1,12 @@
+
 // =====================================================================
-// 1. KONSTRUKTOR & SUPABASE CONFIG
+// 1. KONSTRUKTOR & KONFIGURASI SUPABASE (Hanya satu kali saja!)
 // =====================================================================
 const { createClient } = supabase;
-const _supabase = createClient('https://ldkefnlnpgwgxznemzol.supabase.co', 'sb_publishable_VG1TQwsg40s9ngumFAy-CQ_ORaBQKHG');
+const _supabase = createClient('https://ldkefnlnpgwgxznemzol.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxka2VmbmxucGd3Z3h6bmVtem9sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwODE5NDYsImV4cCI6MjA4NzY1Nzk0Nn0.aRvd4POq_HdTdYVAU-Nl-RFNjeqgPjbNteRYyDdUIvE');
+
 // =====================================================================
-// 1. KONSTRUKTOR & VARIABEL GLOBAL
+// 2. VARIABEL GLOBAL & DOM ELEMENTS
 // =====================================================================
 let debounceTimer;
 const tableBody = document.getElementById('tableBody');
@@ -13,9 +15,13 @@ const editModal = document.getElementById('editModal');
 const rpdModal = document.getElementById('rpdModal');
 const realisasiModal = document.getElementById('realisasiModal');
 
+// Tambahkan ini agar tidak error saat dipanggil di fungsi-fungsi bawah
+const checkAllMaster = document.getElementById('checkAllMaster'); 
+
 let currentRowForEdit = null;
 let targetRowRPD = null;
 let targetRowRealisasi = null;
+
 // Simpan nilai acuan global
 let targetPaguTotal = 0;
 let targetBlokirTotal = 0;
@@ -59,8 +65,6 @@ function initMoneyInputs() {
         });
     });
 }
-
-document.addEventListener('DOMContentLoaded', initMoneyInputs);
 // =====================================================================
 // 3. LOGIKA MANIPULASI TABEL (ADD, DELETE, MOVE)
 // =====================================================================
@@ -301,30 +305,58 @@ document.getElementById('btnEdit').addEventListener('click', function() {
 });
 
 document.getElementById('btnUpdateData').onclick = function() {
-    if (currentRowForEdit) {
-        const c = currentRowForEdit.cells;
-        const level = parseInt(currentRowForEdit.getAttribute('data-level')) || 0;
-        const kodeVal = document.getElementById('editKode').value;
-        const namaVal = document.getElementById('editNama').value;
+    // 1. Amankan currentRowForEdit
+    if (!currentRowForEdit) return;
 
-        c[1].innerHTML = `
-            <div style="display:flex; align-items:center;">
-                <span style="color:#808080; margin-right:5px"></span>
-                <span>${kodeVal}</span>
-            </div>`;
+    const c = currentRowForEdit.cells;
+    const level = parseInt(currentRowForEdit.getAttribute('data-level')) || 0;
+    
+    // 2. Ambil nilai dari input modal
+    const kodeVal = document.getElementById('editKode').value.trim();
+    const namaVal = document.getElementById('editNama').value.trim();
+    // Gunakan getVal untuk memastikan kita mendapat angka murni sebelum diformat ulang
+    const paguMurni = getVal(document.getElementById('editPagu').value);
+    const blokirMurni = getVal(document.getElementById('editBlokir').value);
 
-        c[2].textContent = namaVal;
-        
-        if (level === 4) {
-            c[3].textContent = formatRibuan(document.getElementById('editPagu').value) || "0";
-            c[4].textContent = formatRibuan(document.getElementById('editBlokir').value) || "0";
-        }
-
-        closeAllModals();
-        updateMondas();
-        
-        if (typeof markDirty === 'function') markDirty();
+    // 3. Update Kolom Kode (Level 0-4)
+    // Mencari span terakhir di dalam sel kode agar indentasi (padding) tidak hilang
+    const containerKode = c[1].querySelector('div') || c[1];
+    const spans = containerKode.querySelectorAll('span');
+    
+    if (spans.length > 0) {
+        // Update span yang berisi teks kode (biasanya yang terakhir)
+        spans[spans.length - 1].textContent = kodeVal;
+    } else {
+        c[1].textContent = kodeVal;
     }
+
+    // 4. Update Kolom Nama
+    c[2].textContent = namaVal;
+    
+    // 5. Update Angka (KHUSUS Level 4 / Detail)
+    if (level === 4) {
+        c[3].textContent = toRp(paguMurni);
+        c[4].textContent = toRp(blokirMurni);
+        
+        // Reset RPD & Realisasi jika Pagu menjadi 0 (Opsional, tapi aman)
+        if (paguMurni === 0) {
+            c[5].textContent = "0";
+            c[6].textContent = "0";
+            currentRowForEdit.dataset.rpdBulanan = JSON.stringify(new Array(12).fill(0));
+            currentRowForEdit.dataset.realisasiBulanan = JSON.stringify(new Array(12).fill(0));
+        }
+    }
+
+    // 6. Finalisasi
+    closeAllModals();
+    
+    // Hitung ulang semua total (Induk akan otomatis terupdate)
+    updateMondas();
+    
+    // Reset variabel global edit agar tidak 'nyangkut' ke baris berikutnya
+    currentRowForEdit = null;
+
+    if (typeof markDirty === 'function') markDirty();
 };
 // =====================================================================
 // 7. MODAL RPD
@@ -398,20 +430,32 @@ document.getElementById('btnRPD').addEventListener('click', () => {
         };
     });
 
-    if (btnSimpan) {
+   if (btnSimpan) {
+        // 1. Atur visibilitas tombol (Hanya muncul di Level 4)
         btnSimpan.style.display = isParent ? "none" : "block";
         
+        // 2. BERSIHKAN listener lama (Penting untuk mencegah data tertukar antar baris)
+        btnSimpan.onclick = null; 
        
-            btnSimpan.onclick = () => {
+        // 3. Pasang listener baru
+        btnSimpan.onclick = () => {
+            // Ambil angka murni dari semua input bulan (Jan-Des)
             const murniArr = Array.from(inputs).map(i => getVal(i.value));
+            
+            // Hitung total RPD
             const totalRPD = murniArr.reduce((acc, curr) => acc + curr, 0);
 
-            // Simpan ke dataset
+            // Simpan data ke dalam dataset baris dalam format JSON string
+            // Ini akan dibaca oleh fungsi btnSave saat simpan permanen ke Supabase
             targetRowRPD.dataset.rpdBulanan = JSON.stringify(murniArr);
-            // Update teks kolom RPD (Index 5)
+            
+            // Update tampilan di kolom RPD (Index 5)
             targetRowRPD.cells[5].textContent = toRp(totalRPD);
             
-            updateMondas(); // Ini akan memicu updateDashboardTotal()
+            // Jalankan kalkulasi hierarki agar nilai Induk (Level 0-3) ikut update
+            updateMondas(); 
+            
+            // Tutup modal
             closeAllModals();
         };
     }
@@ -487,19 +531,34 @@ document.getElementById('btnRealisasi').addEventListener('click', () => {
         };
     });
 
-    if (btnSimpan) {
+if (btnSimpan) {
         btnSimpan.style.display = isParent ? "none" : "block";
-        // Cari bagian btnSimpan.onclick di dalam btnRealisasi listener
+        
+        // 1. PENTING: Hapus listener lama agar tidak terjadi penumpukan (leak)
+        btnSimpan.onclick = null; 
+
+        // 2. Pasang listener baru
         btnSimpan.onclick = function() {
+            // Ambil nilai murni dari setiap input bulan
             const murniArr = Array.from(inputs).map(i => getVal(i.value));
+            
+            // Hitung total menggunakan reduce
             const totalReal = murniArr.reduce((acc, curr) => acc + curr, 0);
 
+            // Simpan data array ke dataset dalam bentuk string JSON
             targetRowRealisasi.dataset.realisasiBulanan = JSON.stringify(murniArr);
-            // Update teks kolom Realisasi (Index 6)
+            
+            // Update teks di sel tabel (Kolom Realisasi biasanya index 6)
             targetRowRealisasi.cells[6].textContent = toRp(totalReal);
             
+            // Update perhitungan hierarki (mondas) agar induknya ikut berubah
             updateMondas(); 
+            
+            // Tutup semua modal
             closeAllModals();
+            
+            // Opsional: Tandai bahwa ada perubahan yang belum disimpan ke database
+            if (typeof markDirty === 'function') markDirty();
         };
     }
 
@@ -522,23 +581,11 @@ document.getElementById('btnSave').addEventListener('click', async () => {
             const getArr = (key) => {
                 let d = row.dataset[key];
                 if (!d) return new Array(12).fill(0);
-                
                 try {
-                    // Jika data berupa string JSON (disarankan)
-                    if (typeof d === 'string' && d.startsWith('[')) {
-                        return JSON.parse(d).map(Number);
-                    } 
-                    // Jika data berupa format lama Pipe |
-                    if (typeof d === 'string' && d.includes('|')) {
-                        return d.split('|').map(Number);
-                    }
-                    // Jika data sudah berupa Array objek
-                    if (Array.isArray(d)) return d.map(Number);
-                    
-                    return new Array(12).fill(0);
-                } catch (e) {
-                    return new Array(12).fill(0);
-                }
+                    if (typeof d === 'string' && d.startsWith('[')) return JSON.parse(d).map(Number);
+                    if (typeof d === 'string' && d.includes('|')) return d.split('|').map(Number);
+                    return Array.isArray(d) ? d.map(Number) : new Array(12).fill(0);
+                } catch (e) { return new Array(12).fill(0); }
             };
 
             return {
@@ -557,14 +604,28 @@ document.getElementById('btnSave').addEventListener('click', async () => {
 
         if (rowsToSave.length === 0) throw new Error("Tabel kosong!");
 
-        // Hapus data lama dan masukkan data baru
-        await _supabase.from('anggaran').delete().neq('level', -1);
-        const { error: insError } = await _supabase.from('anggaran').insert(rowsToSave);
+        // 1. HAPUS SEMUA DATA (Menggunakan kriteria yang pasti mencakup semua baris)
+        // .gt('sort_order', -1) memastikan semua data dengan urutan 0, 1, 2... terhapus
+        const { error: delError } = await _supabase
+            .from('anggaran')
+            .delete()
+            .gt('sort_order', -1); 
+
+        if (delError) throw delError;
+
+        // 2. JEDA SEDIKIT (Penting agar Database tuntas melakukan penghapusan)
+        await new Promise(resolve => setTimeout(resolve, 300));
+
+        // 3. MASUKKAN DATA BARU
+        const { error: insError } = await _supabase
+            .from('anggaran')
+            .insert(rowsToSave);
+
         if (insError) throw insError;
 
         alert("✅ Data Berhasil Disimpan Permanen!");
     } catch (err) {
-        console.error(err);
+        console.error("Detail Error:", err);
         alert("❌ Gagal Simpan: " + err.message);
     } finally {
         btn.innerText = originalText;
@@ -572,33 +633,38 @@ document.getElementById('btnSave').addEventListener('click', async () => {
     }
 });
 async function loadDataFromSupabase() {
-    tableBody.innerHTML = "<tr><td colspan='9' class='text-center'>Memuat data...</td></tr>";
+    // 1. Amankan tableBody: Segera kosongkan dan beri indikator loading
+    tableBody.innerHTML = "<tr><td colspan='9' class='text-center'>⏳ Memuat data...</td></tr>";
 
     try {
-        // AMBIL DATA TARGET DARI CLOUD TERLEBIH DAHULU
-        const { data: configData, error: configError } = await _supabase
-            .from('config')
-            .select('pagu_target, blokir_target')
-            .eq('id', 'global_target')
-            .single();
+        // 2. Ambil data secara paralel (lebih cepat daripada satu per satu)
+        const [configRes, anggaranRes] = await Promise.all([
+            _supabase.from('config').select('pagu_target, blokir_target').eq('id', 'global_target').maybeSingle(),
+            _supabase.from('anggaran').select('*').order('sort_order', { ascending: true })
+        ]);
 
-        if (!configError && configData) {
-            targetPaguTotal = configData.pagu_target;
-            targetBlokirTotal = configData.blokir_target;
+        // 3. Tangani Config
+        if (configRes.data) {
+            targetPaguTotal = configRes.data.pagu_target || 0;
+            targetBlokirTotal = configRes.data.blokir_target || 0;
         }
 
-        // AMBIL DATA ANGGARAN
-        const { data, error } = await _supabase.from('anggaran').select('*').order('sort_order', { ascending: true });
-        if (error) throw error;
+        // 4. Tangani Error Anggaran
+        if (anggaranRes.error) throw anggaranRes.error;
 
+        // 5. Bersihkan tableBody lagi sebelum mengisi (Double check anti-double)
         tableBody.innerHTML = ""; 
-        if (!data || data.length === 0) return;
 
-        data.forEach(item => {
+        const data = anggaranRes.data;
+        if (!data || data.length === 0) {
+            tableBody.innerHTML = "<tr><td colspan='9' class='text-center'>Data kosong.</td></tr>";
+            return;
+        }
+
+       data.forEach(item => {
     const row = document.createElement('tr');
     row.setAttribute('data-level', item.level);
     
-    // Dataset harus dalam format string JSON untuk operasional modal nanti
     row.dataset.rpdBulanan = Array.isArray(item.rpd_bulanan) ? JSON.stringify(item.rpd_bulanan) : JSON.stringify(new Array(12).fill(0));
     row.dataset.realisasiBulanan = Array.isArray(item.real_bulanan) ? JSON.stringify(item.real_bulanan) : JSON.stringify(new Array(12).fill(0));
     
@@ -611,27 +677,32 @@ async function loadDataFromSupabase() {
     row.innerHTML = `
         <td class="col-cb text-center"><input type="checkbox" class="row-checkbox"></td>
         <td class="col-kd" style="padding-left:${item.level * 15}px !important">
-            <span>${item.kode || ''}</span>
+            <div style="display: flex; align-items: center;">
+                <span>${item.kode || ''}</span>
+            </div>
         </td>
         <td class="col-nm">${item.nama || ''}</td>
-        <td class="col-idr text-right">${toRp(pagu)}</td>      <td class="col-idr text-right">${toRp(blokir)}</td>    <td class="col-idr text-right">${toRp(rpd)}</td>       <td class="col-idr text-right">${toRp(realisasi)}</td> <td class="col-idr text-right">${toRp(realisasi)}</td> <td class="col-idr text-right" style="${sisa < 0 ? 'color:red;font-weight:bold;' : ''}">${toRp(sisa)}</td> `;
+        <td class="col-idr text-right">${toRp(pagu)}</td>
+        <td class="col-idr text-right">${toRp(blokir)}</td>
+        <td class="col-idr text-right">${toRp(rpd)}</td>
+        <td class="col-idr text-right">${toRp(realisasi)}</td>
+        <td class="col-idr text-right">${toRp(realisasi)}</td>
+        <td class="col-idr text-right" style="${sisa < 0 ? 'color:red;font-weight:bold;' : ''}">${toRp(sisa)}</td>
+    `;
     tableBody.appendChild(row);
 });
 
-// ... (di dalam try block setelah loop tableBody.appendChild)
-        
-        // 1. Jalankan perhitungan hierarki
+        // 7. Finalisasi UI
         updateMondas(); 
-
-        // 2. Paksa update dashboard setelah sedikit jeda agar DOM selesai dirender
-        setTimeout(() => {
-            console.log("Memulai Update Dashboard dari Load Data...");
+        
+        // Gunakan requestAnimationFrame daripada setTimeout untuk performa rendering yang lebih mulus
+        requestAnimationFrame(() => {
             updateDashboardTotal();
-        }, 200);
+        });
 
     } catch (err) {
         console.error("Error loading data:", err);
-        tableBody.innerHTML = "<tr><td colspan='9' class='text-center text-danger'>Gagal memuat: " + err.message + "</td></tr>";
+        tableBody.innerHTML = `<tr><td colspan='9' class='text-center text-danger'>❌ Gagal memuat: ${err.message}</td></tr>`;
     }
 }
 // =====================================================================
@@ -677,36 +748,14 @@ document.getElementById('btnDelete').addEventListener('click', () => {
 // =====================================================================
 // 8. CEKLIST ALL
 // =====================================================================
-const checkAllMaster = document.getElementById('checkAllMaster');
-
-checkAllMaster.addEventListener('change', function() {
-    const checkboxes = tableBody.querySelectorAll('.row-checkbox');
-    
-    checkboxes.forEach(cb => {
-        const row = cb.closest('tr');
-        if (row.style.display !== 'none') {
-            cb.checked = this.checked;
-        }
-    });
-});
-
-tableBody.addEventListener('change', (e) => {
-    if (e.target.classList.contains('row-checkbox')) {
-        const row = e.target.closest('tr');
-        if (e.target.checked) {
-            row.classList.add('row-selected');
-        } else {
-            row.classList.remove('row-selected');
-        }
-    }
-});
-
+// GANTI SEMUA KODE DI POIN 8 DENGAN INI:
 checkAllMaster.addEventListener('change', function() {
     const checkboxes = tableBody.querySelectorAll('.row-checkbox');
     checkboxes.forEach(cb => {
         const row = cb.closest('tr');
         if (row.style.display !== 'none') {
             cb.checked = this.checked;
+            // Langsung update warna baris
             if (this.checked) row.classList.add('row-selected');
             else row.classList.remove('row-selected');
         }
@@ -714,6 +763,9 @@ checkAllMaster.addEventListener('change', function() {
 });
 // =====================================================================
 // 9. TOTAL DAS1
+// =====================================================================
+// =====================================================================
+// 9. UPDATE DASHBOARD (DIPERBAIKI)
 // =====================================================================
 function updateDashboardTotal() {
     const topRows = tableBody.querySelectorAll('tr[data-level="0"]');
@@ -729,23 +781,25 @@ function updateDashboardTotal() {
         }
     });
 
-    // 1. Hitung Pagu Tanpa Blokir
     const paguNetto = totals.pagu - totals.blokir;
 
-    // 2. Mapping ID sesuai HTML Anda
-    const elPaguNetto = document.getElementById('statTotalPagu'); // Box: PAGU TANPA BLOKIR
-    const elRPD       = document.getElementById('statTotalRPD');  // Box: TOTAL RPD
-    const elPaguAll   = document.getElementById('statTotalPaguAll'); // Box: TOTAL PAGU (Jika ada)
-    const elBlokir    = document.getElementById('statTotalBlokir');
-    const elReal      = document.getElementById('statTotalRealisasi');
+    // Gunakan fungsi bantuan agar jika ID tidak ada di HTML, script tidak mati
+    const safeSetText = (id, text) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = text;
+    };
 
-    // 3. Update Tampilan
-    if (elPaguNetto) elPaguNetto.textContent = toRp(paguNetto);
-    if (elRPD)       elRPD.textContent = toRp(totals.rpd);
-    if (elBlokir)    elBlokir.textContent = toRp(totals.blokir);
-    if (elReal)      elReal.textContent = toRp(totals.real);
-    if (elPaguAll)   elPaguAll.textContent = toRp(totals.pagu);
+    safeSetText('statTotalPagu', toRp(paguNetto));
+    safeSetText('statTotalRPD', toRp(totals.rpd));
+    safeSetText('statTotalBlokir', toRp(totals.blokir));
+    safeSetText('statTotalRealisasi', toRp(totals.real));
+    safeSetText('statTotalPaguAll', toRp(totals.pagu));
 }
+
+// =====================================================================
+// 10. FINAL INITIALIZATION (KONSOLIDASI)
+// =====================================================================
+
 // =====================================================================
 // 10. DASBOARD
 // =====================================================================
@@ -980,26 +1034,21 @@ document.getElementById('btnSubmitInput').onclick = async function() {
         btn.innerText = originalText;
     }
 };
-
+// Letakkan di paling bawah file script.js
 document.addEventListener('DOMContentLoaded', () => {
-    initMoneyInputs();
-    loadDataFromSupabase();
-});
-
-async function logoutAplikasi() {
-    // 1. Konfirmasi ke pengguna (Gaya Windows)
-    const yakin = confirm("Apakah Anda yakin ingin keluar dari Sistem RPD?");
+    console.log("Sistem Anggaran Klasik Ready...");
     
-    if (yakin) {
-        // 2. Proses logout dari Supabase
-        const { error } = await supabaseClient.auth.signOut();
-        
-        if (error) {
-            alert("Gagal keluar: " + error.message);
-        } else {
-            // 3. Kembali ke halaman login
-            // alert("Anda telah keluar secara aman.");
-            window.location.href = 'login.html';
-        }
+    // Inisialisasi format input uang
+    if (typeof initMoneyInputs === 'function') initMoneyInputs();
+    
+    // Ambil data dari database
+    if (typeof loadDataFromSupabase === 'function') {
+        loadDataFromSupabase();
+    }
+});
+async function logoutAplikasi() {
+    if (confirm("Apakah Anda yakin ingin keluar?")) {
+        await _supabase.auth.signOut();
+        window.location.replace('login.html');
     }
 }
