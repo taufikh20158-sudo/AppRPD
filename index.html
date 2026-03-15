@@ -14,32 +14,29 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
     <link rel="stylesheet" href="style.css">
 
-    <script>
-        const supabaseUrl = 'https://ldkefnlnpgwgxznemzol.supabase.co';
-        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxka2VmbmxucGd3Z3h6bmVtem9sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwODE5NDYsImV4cCI6MjA4NzY1Nzk0Nn0.aRvd4POq_HdTdYVAU-Nl-RFNjeqgPjbNteRYyDdUIvE'; 
-        const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
+  <script>
+    // Gunakan nama yang berbeda atau biarkan script.js yang menangani client
+    const supabaseUrl = 'https://ldkefnlnpgwgxznemzol.supabase.co';
+    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxka2VmbmxucGd3Z3h6bmVtem9sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwODE5NDYsImV4cCI6MjA4NzY1Nzk0Nn0.aRvd4POq_HdTdYVAU-Nl-RFNjeqgPjbNteRYyDdUIvE'; // Key Anda
+    
+    // PERBAIKAN: Gunakan nama variabel lain, misal 'supabaseAuth'
+    const supabaseAuth = supabase.createClient(supabaseUrl, supabaseKey);
 
-        async function cekAkses() {
-            try {
-                // Ambil sesi terbaru
-                const { data: { session }, error } = await supabaseClient.auth.getSession();
-                
-                if (!session || error) {
-                    // JIKA TIDAK LOGIN: Tendang ke login.html
-                    // Gunakan path relatif yang aman
-                    window.location.replace('login.html');
-                } else {
-                    // JIKA LOGIN SAH: Buka gembok tampilan
-                    document.documentElement.style.display = 'block';
-                }
-            } catch (err) {
+    async function cekAkses() {
+        try {
+            const { data: { session }, error } = await supabaseAuth.auth.getSession();
+            
+            if (!session || error) {
                 window.location.replace('login.html');
+            } else {
+                document.documentElement.style.display = 'block';
             }
+        } catch (err) {
+            window.location.replace('login.html');
         }
-        
-        // Jalankan pengecekan
-        cekAkses();
-    </script>
+    }
+    cekAkses();
+</script>
 </head>
 <body>
     <div class="app-wrapper" id="mainApp">
