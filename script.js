@@ -194,7 +194,6 @@ function updateMondas() {
     if (rows.length === 0) return;
 
     // --- STEP 1: AKUMULASI HIRARKI (Bottom-Up) ---
-    // Loop dari bawah ke atas agar nilai anak terjumlah ke induk secara berantai
     for (let i = rows.length - 1; i >= 0; i--) {
         const row = rows[i];
         const level = parseInt(row.getAttribute('data-level')) || 0;
@@ -206,18 +205,32 @@ function updateMondas() {
         if (hasChild) {
             let sums = { pagu: 0, blokir: 0, rpd: 0, real: 0 };
             
-            // Cari semua baris di bawahnya yang merupakan Level + 1 (anak langsung)
+            // Penampung untuk akumulasi array bulanan (Jan-Des)
+            let sumRPDBulanan = new Array(12).fill(0);
+            let sumRealBulanan = new Array(12).fill(0);
+            
             for (let j = i + 1; j < rows.length; j++) {
                 const child = rows[j];
                 const childLv = parseInt(child.getAttribute('data-level')) || 0;
                 
-                if (childLv <= level) break; // Berhenti jika bertemu baris dengan level sejajar atau lebih tinggi
+                if (childLv <= level) break; 
                 
                 if (childLv === level + 1) {
                     sums.pagu   += getVal(child.cells[3].textContent);
                     sums.blokir += getVal(child.cells[4].textContent);
                     sums.rpd    += getVal(child.cells[5].textContent);
                     sums.real   += getVal(child.cells[6].textContent);
+
+                    // --- LOGIKA TAMBAHAN: Akumulasi Array Bulanan ---
+                    try {
+                        const cRPD = JSON.parse(child.dataset.rpdBulanan || "[]");
+                        const cReal = JSON.parse(child.dataset.realisasiBulanan || "[]");
+                        
+                        for (let k = 0; k < 12; k++) {
+                            sumRPDBulanan[k] += (Number(cRPD[k]) || 0);
+                            sumRealBulanan[k] += (Number(cReal[k]) || 0);
+                        }
+                    } catch (e) { console.error("Error parse dataset di row:", child); }
                 }
             }
             
@@ -226,18 +239,22 @@ function updateMondas() {
             cells[4].textContent = toRp(sums.blokir);
             cells[5].textContent = toRp(sums.rpd);
             cells[6].textContent = toRp(sums.real);
+
+            // --- SIMPAN HASIL AKUMULASI KE DATASET INDUK ---
+            // Ini yang membuat Level 3, 2, 1, 0 memiliki data bulanan
+            row.dataset.rpdBulanan = JSON.stringify(sumRPDBulanan);
+            row.dataset.realisasiBulanan = JSON.stringify(sumRealBulanan);
         }
         
-        // Hitung sisa pagu dan pewarnaan per baris
         calculateRowTotal(row);
     }
 
     // --- STEP 2: UPDATE DASHBOARD ---
-    // Sangat penting memanggil ini DI SINI agar Dashboard sinkron dengan hasil akumulasi tabel
     if (typeof updateDashboardTotal === 'function') {
         updateDashboardTotal();
     }
-    // --- STEP 3: LOGIKA WARNA (Bandingkan Tabel vs Target Cloud) ---
+
+    // --- STEP 3: LOGIKA WARNA ---
     const elPaguAll = document.getElementById('statTotalPaguAll');
     const elBlokir = document.getElementById('statTotalBlokir');
 
@@ -818,61 +835,43 @@ document.getElementById('dashPeriodSelect').onchange = function() {
 
 function updateDashboardStats(period) {
     const rows = document.querySelectorAll('#tableBody tr');
-    
     let stats = {
-        peg: { rpd: 0, real: 0 },
-        bar: { rpd: 0, real: 0 },
-        mod: { rpd: 0, real: 0 },
-        rm:  { rpd: 0, real: 0 },
-        pnp: { rpd: 0, real: 0 }
+        peg: { rpd: 0, real: 0 }, bar: { rpd: 0, real: 0 }, mod: { rpd: 0, real: 0 },
+        rm:  { rpd: 0, real: 0 }, pnp: { rpd: 0, real: 0 }
     };
 
     rows.forEach((row) => {
-        const level = row.getAttribute('data-level');
-        // Hanya memproses Level 3 (Detail Kategori)
-        if (level !== "3") return;
+        // FILTER KEMBALI KE LEVEL 3
+        if (row.getAttribute('data-level') !== "3") return;
 
-        // Ambil Kode Murni (Menangani struktur span di dalam cell)
-        const cellKode = row.cells[1].querySelectorAll('span');
-        let kodeFull = (cellKode.length > 1 ? cellKode[1].innerText : row.cells[1].innerText).trim().toUpperCase();
+        const kodeFull = row.cells[1].innerText.trim().toUpperCase();
+        let vRPD = 0, vReal = 0;
 
-        let vRPD = 0;
-        let vReal = 0;
-
-        // Penentuan Nilai berdasarkan Periode (Tahunan vs Bulanan)
         if (period === "TAHUNAN") {
             vRPD = getVal(row.cells[5].innerText);
             vReal = getVal(row.cells[6].innerText);
         } else {
             const pIdx = parseInt(period);
-            const strRPD = row.dataset.rpdBulanan || "0|0|0|0|0|0|0|0|0|0|0|0";
-            const strReal = row.dataset.realisasiBulanan || "0|0|0|0|0|0|0|0|0|0|0|0";
+            const arrRPD = JSON.parse(row.dataset.rpdBulanan || "[]");
+            const arrReal = JSON.parse(row.dataset.realisasiBulanan || "[]");
             
-            const arrRPD = strRPD.split('|');
-            const arrReal = strReal.split('|');
-            
-            vRPD = getVal(arrRPD[pIdx]);
-            vReal = getVal(arrReal[pIdx]);
+            vRPD = arrRPD[pIdx] || 0;
+            vReal = arrReal[pIdx] || 0;
         }
 
-        // Filter Jenis Belanja (Berdasarkan 2 angka depan kode)
-        if (kodeFull.startsWith("51")) { 
-            stats.peg.rpd += vRPD; stats.peg.real += vReal; 
-        } else if (kodeFull.startsWith("52")) { 
-            stats.bar.rpd += vRPD; stats.bar.real += vReal; 
-        } else if (kodeFull.startsWith("53")) { 
-            stats.mod.rpd += vRPD; stats.mod.real += vReal; 
-        }
+        // Distribusi Nilai (Gunakan includes agar lebih aman dari spasi)
+        if (kodeFull.includes("51")) { stats.peg.rpd += vRPD; stats.peg.real += vReal; }
+        else if (kodeFull.includes("52")) { stats.bar.rpd += vRPD; stats.bar.real += vReal; }
+        else if (kodeFull.includes("53")) { stats.mod.rpd += vRPD; stats.mod.real += vReal; }
 
-        // Filter Sumber Dana (Berdasarkan huruf terakhir kode)
-        if (kodeFull.endsWith("R")) { 
-            stats.rm.rpd += vRPD; stats.rm.real += vReal; 
-        } else if (kodeFull.endsWith("P")) { 
-            stats.pnp.rpd += vRPD; stats.pnp.real += vReal; 
-        }
+        if (kodeFull.includes("R")) { stats.rm.rpd += vRPD; stats.rm.real += vReal; }
+        else if (kodeFull.includes("P")) { stats.pnp.rpd += vRPD; stats.pnp.real += vReal; }
     });
 
-    // RENDERER UNTUK BARIS DETAIL DASHBOARD
+    renderDashboardUI(stats);
+}
+
+function renderDashboardUI(stats) {
     const renderRow = (idPrefix, data) => {
         const sisa = data.rpd - data.real;
         const prs = data.rpd > 0 ? (data.real / data.rpd * 100) : 0;
@@ -885,43 +884,29 @@ function updateDashboardStats(period) {
         if (elRPD) elRPD.innerText = toRp(data.rpd);
         if (elReal) elReal.innerText = toRp(data.real);
         if (elSisa) elSisa.innerText = toRp(sisa);
-        
-        if (elPersen) {
-            elPersen.innerText = (prs === 0 ? "0" : prs.toFixed(2)) + "%";
-            // Feedback warna baris detail
-            if (prs > 105) elPersen.style.color = "#ff4d4d";
-            else if (prs > 0) elPersen.style.color = "#0f100f";
-            else elPersen.style.color = "";
-        }
+        if (elPersen) elPersen.innerText = prs.toFixed(2) + "%";
     };
 
-    // Render baris kategori bawah
     renderRow("dashPeg", stats.peg);
     renderRow("dashBar", stats.bar);
     renderRow("dashMod", stats.mod);
     renderRow("dashRM", stats.rm);
     renderRow("dashPNBP", stats.pnp);
 
-    // --- UPDATE MONITOR UTAMA (ATAS) ---
+    // Update Monitor Utama Atas
     const tTotalRPD = stats.peg.rpd + stats.bar.rpd + stats.mod.rpd;
     const tTotalReal = stats.peg.real + stats.bar.real + stats.mod.real;
-
+    
     const mRPD = document.getElementById("dashRPD");
     const mReal = document.getElementById("dashReal");
-    // ID DI BAWAH INI HARUS 'dashPersen' AGAR COCOK DENGAN HTML ANDA
-    const mPersen = document.getElementById("dashPersen"); 
+    const mPersen = document.getElementById("dashPersen");
 
     if (mRPD) mRPD.innerText = toRp(tTotalRPD);
     if (mReal) mReal.innerText = toRp(tTotalReal);
-    
     if (mPersen) {
         const totalPrs = tTotalRPD > 0 ? (tTotalReal / tTotalRPD * 100) : 0;
         mPersen.innerText = totalPrs.toFixed(2) + "%";
-        
-        // Warna Neon Green di Monitor Hitam
-        if (totalPrs > 105) mPersen.style.color = "#ff4d4d"; // Merah jika over
-        else if (totalPrs > 0) mPersen.style.color = "#0f0"; // Hijau neon
-        else mPersen.style.color = "#fff"; // Putih jika 0
+        mPersen.style.color = totalPrs > 105 ? "#ff4d4d" : (totalPrs > 0 ? "#0f0" : "#fff");
     }
 }
 // ====================
