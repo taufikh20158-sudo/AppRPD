@@ -1,14 +1,24 @@
+/**
+ * monitoring.js - Penyesuaian Grid dengan Switcher RPD/REAL
+ */
+
 const { createClient } = window.supabase; 
 const _supabase = createClient('https://ldkefnlnpgwgxznemzol.supabase.co', 'sb_publishable_VG1TQwsg40s9ngumFAy-CQ_ORaBQKHG');
 
 const containerData = document.getElementById('CON2');
 let currentMode = 'RPD'; // State untuk melacak mode aktif
 
+// =====================================================================
+// HELPER UTAMA
+// =====================================================================
 const toRp = (num) => {
     if (num === null || num === undefined) return "0";
     return Math.round(num).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
 };
 
+/**
+ * Parser Fleksibel: Mengubah data mentah (String/Array) menjadi Array 12 Bulan
+ */
 const parseBulanan = (data) => {
     if (!data) return new Array(12).fill(0);
     
@@ -28,6 +38,9 @@ const parseBulanan = (data) => {
     return new Array(12).fill(0);
 };
 
+// =====================================================================
+// CORE FUNCTION: LOAD & RENDER
+// =====================================================================
 async function loadMonitoringData(mode = 'RPD') {
     if (!containerData) return console.error("Elemen CON2 tidak ditemukan di HTML!");
     currentMode = mode; // Simpan mode aktif
@@ -49,6 +62,7 @@ async function loadMonitoringData(mode = 'RPD') {
         containerData.innerHTML = ""; 
 
         data.forEach(item => {
+            // GUNAKAN PARSER BARU UNTUK MENGHINDARI ERROR .SPLIT()
             const rawData = mode === 'RPD' ? item.rpd_bulanan : item.real_bulanan;
             const bulananArr = parseBulanan(rawData);
             
@@ -62,7 +76,7 @@ async function loadMonitoringData(mode = 'RPD') {
             bulanHTML += `</div>`;
 
             const totalTampil = mode === 'RPD' ? (item.rpd_total || 0) : (item.real_total || 0);
-            const sisa = (item.pagu || 0) - totalTampil;
+            const sisa = (item.pagu || 0) - totalTampil; // Sekarang SISA = PAGU - TOTAL (baik RPD maupun REAL)
 
             row.innerHTML = `
                 <div class="col-kode lvl-${item.level}">${item.kode || ''}</div>
@@ -81,6 +95,10 @@ async function loadMonitoringData(mode = 'RPD') {
         containerData.innerHTML = `<div style='text-align:center; color:red; padding:20px;'>Error: ${err.message}</div>`;
     }
 }
+
+// =====================================================================
+// EVENT LISTENERS
+// =====================================================================
 document.addEventListener('DOMContentLoaded', () => {
     loadMonitoringData('RPD');
 
@@ -108,6 +126,8 @@ async function exportToPDF() {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF('l', 'mm', 'a2'); 
 
+    // 1. Tentukan Judul Berdasarkan Konteks (Gunakan variabel global atau cek state data)
+    // Asumsi: Anda memiliki variabel global 'currentMode' atau cek dari teks UI
     const reportTitle = (typeof currentMode !== 'undefined' && currentMode === 'REAL')
         ? "REALISASI PENARIKAN DANA BULANAN" 
         : "RENCANA PENARIKAN DANA ( RPD ) BULANAN";
@@ -128,6 +148,7 @@ async function exportToPDF() {
         tableData.push(rowData);
     });
 
+    // 2. Render Tabel dengan Header di Setiap Halaman
     doc.autoTable({
         head: headers,
         body: tableData,
@@ -144,6 +165,7 @@ async function exportToPDF() {
             14: { halign: 'right' }, 15: { halign: 'right' }, 16: { halign: 'right' },
             17: { halign: 'right' }
         },
+        // Fungsi ini dipanggil setiap kali halaman baru dibuat
         didDrawPage: (data) => {
             doc.setFontSize(18);
             doc.setFont("helvetica", "bold");
@@ -157,11 +179,14 @@ async function exportToPDF() {
         margin: { top: 40 }
     });
 
+    // 3. Logika Footer (Tanda Tangan) - Muncul di Halaman Terakhir
     const finalY = doc.lastAutoTable.finalY;
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
     const signX = pageWidth - 120; // Posisi horizontal tanda tangan
 
+    // Jika sisa ruang di bawah tabel tidak cukup untuk tanda tangan (butuh sekitar 60mm)
+    // maka pindah ke halaman baru
     if (finalY + 60 > pageHeight) {
         doc.addPage();
         var currentY = 40; // Mulai dari atas di halaman baru
