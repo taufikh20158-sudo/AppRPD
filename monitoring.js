@@ -43,7 +43,7 @@ const parseBulanan = (data) => {
 // =====================================================================
 async function loadMonitoringData(mode = 'RPD') {
     if (!containerData) return console.error("Elemen CON2 tidak ditemukan di HTML!");
-    currentMode = mode; // Simpan mode aktif
+    currentMode = mode; 
 
     containerData.innerHTML = `<div style='padding:20px; color:#4ade80; text-align:center;'>MEMUAT DATA ${mode}...</div>`;
 
@@ -62,7 +62,6 @@ async function loadMonitoringData(mode = 'RPD') {
         containerData.innerHTML = ""; 
 
         data.forEach(item => {
-            // GUNAKAN PARSER BARU UNTUK MENGHINDARI ERROR .SPLIT()
             const rawData = mode === 'RPD' ? item.rpd_bulanan : item.real_bulanan;
             const bulananArr = parseBulanan(rawData);
             
@@ -75,17 +74,27 @@ async function loadMonitoringData(mode = 'RPD') {
             });
             bulanHTML += `</div>`;
 
+            // 1. Tentukan Total yang tampil di kolom TOTAL (sesuai mode RPD/REAL)
             const totalTampil = mode === 'RPD' ? (item.rpd_total || 0) : (item.real_total || 0);
-            const sisa = (item.pagu || 0) - totalTampil; // Sekarang SISA = PAGU - TOTAL (baik RPD maupun REAL)
+
+            // 2. LOGIKA BARU SISA: Pagu - Blokir - Realisasi
+            // Catatan: Kita selalu menggunakan item.real_total sebagai pengurang Realisasi
+            const pagu      = item.pagu || 0;
+            const blokir    = item.blokir || 0;
+            const realisasi = item.real_total || 0; 
+            
+            const sisa = pagu - blokir - realisasi;
 
             row.innerHTML = `
                 <div class="col-kode lvl-${item.level}">${item.kode || ''}</div>
                 <div class="col-nama">${item.nama || ''}</div>
-                <div class="col-pagu">${toRp(item.pagu || 0)}</div>
+                <div class="col-pagu">${toRp(pagu)}</div>
                 ${bulanHTML}
                 <div class="col-total">${toRp(totalTampil)}</div>
-                <div class="col-blokir">${toRp(item.blokir || 0)}</div>
-                <div class="col-sisa">${toRp(sisa)}</div>
+                <div class="col-blokir">${toRp(blokir)}</div>
+                <div class="col-sisa" style="color: ${sisa < 0 ? '#ff4d4d' : 'inherit'}; font-weight: ${sisa < 0 ? 'bold' : 'normal'};">
+                    ${toRp(sisa)}
+                </div>
             `;
             containerData.appendChild(row);
         });
@@ -95,7 +104,6 @@ async function loadMonitoringData(mode = 'RPD') {
         containerData.innerHTML = `<div style='text-align:center; color:red; padding:20px;'>Error: ${err.message}</div>`;
     }
 }
-
 // =====================================================================
 // EVENT LISTENERS
 // =====================================================================
