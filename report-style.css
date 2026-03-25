@@ -1,0 +1,159 @@
+/* =====================================================================
+   1. DEFINISI VARIABEL
+   ===================================================================== */
+:root {
+    --w-uraian: 200px;
+    --w-pagu: 110px;
+    --w-bulan-data: 95px; /* Lebar RM, PNBP, TOTAL */
+    --w-bulan-pct: 50px;  /* Lebar khusus kolom % */
+}
+
+/* =====================================================================
+   2. FONDASI DASAR & TEMA WINDOWS 95
+   ===================================================================== */
+* {
+    box-sizing: border-box;
+    font-family: "MS Sans Serif", "Arial", sans-serif;
+    font-size: 11px;
+}
+
+body {
+    background-color: #008080;
+    padding: 10px;
+    margin: 0;
+    overflow-x: hidden;
+}
+
+.window {
+    background-color: #c0c0c0;
+    border: 2px solid;
+    border-color: #ffffff #000000 #000000 #ffffff;
+    box-shadow: 1px 1px 0 0 #808080;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.title-bar {
+    background: linear-gradient(90deg, #000080, #1084d0);
+    padding: 3px 5px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: white;
+    font-weight: bold;
+}
+
+/* =====================================================================
+   3. TABEL SPREADSHEET
+   ===================================================================== */
+.window-body {
+    padding: 8px;
+}
+
+.table-container-90s {
+    overflow: auto; 
+    max-height: 75vh;
+    border: 2px solid;
+    border-color: #808080 #ffffff #ffffff #808080;
+    background-color: #ffffff;
+    width: 100%;
+}
+
+table {
+    border-collapse: separate;
+    border-spacing: 0;
+    table-layout: fixed; /* WAJIB agar variabel lebar dipatuhi */
+    width: max-content; 
+}
+
+th {
+    background-color: #c0c0c0;
+    border: 1px solid;
+    border-color: #ffffff #808080 #808080 #ffffff;
+    padding: 5px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.header-level-1 th { top: 0; z-index: 11; }
+/* Sesuaikan 'top' jika teks header level 1 bungkus ke baris baru */
+.header-level-2 th { top: 25px; z-index: 10; } 
+
+/* STICKY COLUMN (URAIAN) */
+.sticky-col {
+    width: var(--w-uraian);
+    min-width: var(--w-uraian);
+    position: sticky;
+    left: 0;
+    z-index: 20 !important;
+    background-color: #c0c0c0;
+    text-align: left !important;
+}
+
+/* LEBAR KOLOM STATIS (Pagu, Blokir, Neto) */
+th:nth-child(2), th:nth-child(3), th:nth-child(4),
+td:nth-child(2), td:nth-child(3), td:nth-child(4) {
+    width: var(--w-pagu);
+}
+
+/* LEBAR KOLOM DATA BULANAN */
+.header-level-2 th {
+    width: var(--w-bulan-data);
+}
+
+/* LEBAR KHUSUS KOLOM PERSEN (%) */
+/* Karena kolom dimulai dari index 5 (setelah 4 kolom awal), 
+   maka kolom % adalah kolom ke 8, 12, 16, dst (rumus 4n+8) */
+.header-level-2 th:nth-child(4n),
+th:nth-child(4n+8), 
+td:nth-child(4n+8) {
+    width: var(--w-bulan-pct);
+}
+
+td {
+    border: 1px solid #d0d0d0;
+    padding: 4px;
+    white-space: nowrap;
+    text-align: right;
+    font-family: "Courier New", monospace;
+}
+
+/* =====================================================================
+   4. PEMBATAS ANTAR BULAN
+   ===================================================================== */
+
+/* Pembatas pada Nama Bulan (Header Atas) */
+.header-level-1 th {
+    border-right: 2px solid #808080 !important;
+}
+
+/* Pembatas Vertikal setiap akhir kolom % */
+th:nth-child(4n+8), 
+td:nth-child(4n+8) {
+    border-right: 2px solid #808080 !important;
+}
+
+
+/* Background halus untuk kolom % agar mata mudah navigasi */
+td:nth-child(4n+8) {
+    background-color: #eeeaea; 
+}
+
+/* =====================================================================
+   5. SPECIAL ROWS & SCROLLBAR
+   ===================================================================== */
+.row-total-90s {
+    background-color: #d0d0d0 !important;
+    color: #000000 !important;
+    font-weight: bold;
+}
+
+.table-container-90s::-webkit-scrollbar { width: 16px; height: 14px; }
+.table-container-90s::-webkit-scrollbar-thumb {
+    background-color: #c0c0c0;
+    border: 2px solid;
+    border-color: #ffffff #000000 #000000 #ffffff;
+    box-shadow: inset 1px 1px 0 #fff, inset -1px -1px 0 #808080;
+}
