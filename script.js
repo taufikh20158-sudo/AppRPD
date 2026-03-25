@@ -167,10 +167,11 @@ function calculateRowTotal(row) {
     const c = row.cells;
     
     const pagu      = getVal(c[3].textContent);
+    const blokir    = getVal(c[4].textContent);
     const rpd       = getVal(c[5].textContent);
     const realisasi = getVal(c[6].textContent);
 
-    const sisa = pagu - realisasi;
+    const sisa = pagu-blokir-realisasi;
 
     c[7].textContent = toRp(realisasi); 
     c[8].textContent = toRp(sisa);
