@@ -187,9 +187,6 @@ body, html {
 #MAIN_TABLE_WRAPPER::-webkit-scrollbar-thumb { background: #334155; border-radius: 5px; }
 
 /* ============================================================
-   NAVBAR (TINY_NAV) - REFINED & PRO STYLE
-   ============================================================ */
-/* ============================================================
    NAVBAR (TINY_NAV) - MINIMALIST & COMPACT
    ============================================================ */
 
@@ -243,37 +240,51 @@ body, html {
    ============================================================ */
 .dropdown {
     position: relative;
+    /* Tambahkan padding agar area hover lebih luas */
+    padding-right: 10px; 
 }
 
 .dropdown-items {
-    display: none; /* Sembunyikan default */
+    display: none;
     position: absolute;
     top: 0;
-    left: calc(100% + 5px); /* Muncul tepat di samping */
+    /* Ganti 5px dengan 0 atau gunakan pseudo-element untuk menjembatani celah */
+    left: 100%; 
     background: #ffffff;
-    min-width: 80px;
+    min-width: 100px; /* Sedikit diperlebar agar teks tidak sesak */
     border: 1px solid #e2e8f0;
     border-radius: 4px;
-    box-shadow: 2px 2px 8px rgba(0,0,0,0.1);
+    box-shadow: 2px 2px 10px rgba(0,0,0,0.15);
     z-index: 1000;
+    padding: 4px 0;
 }
 
-/* Munculkan saat hover */
+/* JEMBATAN INVISIBLE: Menghilangkan celah agar hover tidak terputus */
+.dropdown-items::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: -15px; /* Menutup celah ke kiri */
+    width: 15px;
+    height: 100%;
+    background: transparent;
+}
+
 .dropdown:hover .dropdown-items {
     display: block;
 }
 
 .dropdown-items a {
     display: block;
-    padding: 6px 10px;
-    font-size: 9px;
+    padding: 8px 12px; /* Padding diperbesar agar lebih mudah diklik jari/kursor */
+    font-size: 10px;   /* Ukuran font dinaikkan sedikit agar terbaca */
     font-weight: 600;
     color: #475569;
     text-decoration: none;
-    white-space: nowrap;
+    transition: background 0.2s; /* Transisi halus */
 }
 
 .dropdown-items a:hover {
-    background: #f1f5f9;
-    color: #1e293b;
+    background: #3b82f6; /* Warna biru agar lebih kontras */
+    color: #ffffff;
 }
