@@ -166,28 +166,40 @@ document.getElementById('btnMoveUp').addEventListener('click', () => {
 function calculateRowTotal(row) {
     const c = row.cells;
     
-    const pagu      = getVal(c[3].textContent);
-    const blokir    = getVal(c[4].textContent);
-    const rpd       = getVal(c[5].textContent);
-    const realisasi = getVal(c[6].textContent);
+    // Ambil nilai dari masing-masing kolom (asumsi indeks kolom tetap)
+    const pagu      = getVal(c[3].textContent); // Kolom PAGU
+    const blokir    = getVal(c[4].textContent); // Kolom BLOKIR
+    const rpd       = getVal(c[5].textContent); // Kolom RPD
+    const realisasi = getVal(c[6].textContent); // Kolom REALISASI
 
-    const sisa = pagu-blokir-realisasi;
+    // 1. LOGIKA SISA: Dana riil yang masih ada (setelah potong blokir & pakai)
+    const sisa = pagu - blokir - realisasi;
 
-    c[7].textContent = toRp(realisasi); 
-    c[8].textContent = toRp(sisa);
+    // 2. LOGIKA KEKURANGAN: Selisih antara target Pagu dengan Rencana (RPD)
+    const kekurangan = pagu - rpd;
 
-    if (pagu !== rpd) {
-        row.style.backgroundColor = "rgba(255, 255, 0, 0.2)";
+    // Tampilkan hasil ke kolom masing-masing
+    c[7].textContent = toRp(sisa);       // Kolom SISA
+    c[8].textContent = toRp(kekurangan); // Kolom KEKURANGAN (PAGU - RPD)
+
+    // --- FEEDBACK VISUAL ---
+
+    // Warna Merah jika Sisa Minus (Overbudget)
+    if (sisa < 0) {
+        c[7].style.color = "#ff0000";
+        c[7].style.fontWeight = "bold";
     } else {
-        row.style.backgroundColor = "";
+        c[7].style.color = ""; 
+        c[7].style.fontWeight = "normal";
     }
 
-    if (sisa < 0) {
-        c[8].style.color = "#ff0000";
-        c[8].style.fontWeight = "bold";
+    // Highlight Kuning jika RPD belum sinkron dengan PAGU (Kekurangan != 0)
+    if (kekurangan !== 0) {
+        row.style.backgroundColor = "rgba(255, 255, 0, 0.2)";
+        c[8].style.color = "#856404"; // Warna teks coklat tua agar kontras dengan kuning
     } else {
-        c[8].style.color = ""; 
-        c[8].style.fontWeight = "normal";
+        row.style.backgroundColor = "";
+        c[8].style.color = "#28a745"; // Warna hijau jika sudah pas 0
     }
 }
 function updateMondas() {
