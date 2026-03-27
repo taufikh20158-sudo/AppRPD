@@ -792,9 +792,6 @@ checkAllMaster.addEventListener('change', function() {
     });
 });
 // =====================================================================
-// 9. TOTAL DAS1
-// =====================================================================
-// =====================================================================
 // 9. UPDATE DASHBOARD (DIPERBAIKI)
 // =====================================================================
 function updateDashboardTotal() {
@@ -825,11 +822,6 @@ function updateDashboardTotal() {
     safeSetText('statTotalRealisasi', toRp(totals.real));
     safeSetText('statTotalPaguAll', toRp(totals.pagu));
 }
-
-// =====================================================================
-// 10. FINAL INITIALIZATION (KONSOLIDASI)
-// =====================================================================
-
 // =====================================================================
 // 10. DASBOARD
 // =====================================================================
@@ -872,11 +864,20 @@ function updateDashboardStats(period) {
             vReal = arrReal[pIdx] || 0;
         }
 
-        // Distribusi Nilai (Gunakan includes agar lebih aman dari spasi)
-        if (kodeFull.includes("51")) { stats.peg.rpd += vRPD; stats.peg.real += vReal; }
-        else if (kodeFull.includes("52")) { stats.bar.rpd += vRPD; stats.bar.real += vReal; }
-        else if (kodeFull.includes("53")) { stats.mod.rpd += vRPD; stats.mod.real += vReal; }
+        const kodeStr = String(kodeFull);
 
+        if (kodeStr.startsWith("51")) { 
+            stats.peg.rpd += vRPD; 
+            stats.peg.real += vReal; 
+        } 
+        else if (kodeStr.startsWith("52")) { 
+            stats.bar.rpd += vRPD; 
+            stats.bar.real += vReal; 
+        } 
+        else if (kodeStr.startsWith("53")) { 
+            stats.mod.rpd += vRPD; 
+            stats.mod.real += vReal; 
+        }
         if (kodeFull.includes("R")) { stats.rm.rpd += vRPD; stats.rm.real += vReal; }
         else if (kodeFull.includes("P")) { stats.pnp.rpd += vRPD; stats.pnp.real += vReal; }
     });
