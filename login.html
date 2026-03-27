@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistem Monitoring RPD 2026 - Booting...</title>
+    <title>Sistem Monitoring RPD</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -189,18 +189,6 @@
             </div>
         </div>
     </div>
-
-    <div class="taskbar">
-        <button class="start-btn" onclick="alert('Sistem akan dikunci sampai Anda login.')">
-            <img src="https://win98icons.alexmeub.com/icons/png/windows-0.png" width="16">
-            Start
-        </button>
-        <div class="system-tray">
-            <img src="https://win98icons.alexmeub.com/icons/png/loudspeaker_rays-0.png" width="14">
-            <div id="clock">00:00</div>
-        </div>
-    </div>
-
     <script>
     // 1. PASTIKAN KEY DI BAWAH INI ADALAH KEY LENGKAP (TIDAK ADA TITIK-TITIK)
     const SUPABASE_URL = 'https://ldkefnlnpgwgxznemzol.supabase.co';
@@ -248,18 +236,6 @@
             }
         });
     }
-
-    function startTime() {
-        const today = new Date();
-        let h = today.getHours(); 
-        let m = today.getMinutes();
-        h = h < 10 ? "0" + h : h;
-        m = m < 10 ? "0" + m : m;
-        const clockEl = document.getElementById('clock');
-        if (clockEl) clockEl.innerHTML = h + ":" + m;
-        setTimeout(startTime, 1000);
-    }
-    startTime();
 </script>
 </body>
 </html>
