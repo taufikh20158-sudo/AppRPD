@@ -47,6 +47,16 @@ async function loadMonitoringData(mode = 'RPD') {
 
     containerData.innerHTML = `<div style='padding:20px; color:#4ade80; text-align:center;'>MEMUAT DATA ${mode}...</div>`;
 
+    // 1. Inisialisasi Akumulator untuk Footer
+    let grandTotal = {
+        pagu: 0,
+        blokir: 0,
+        totalTampil: 0, // Mengikuti mode (RPD/REAL)
+        realTotal: 0,   // Untuk hitung sisa riil
+        rpdTotal: 0,    // Untuk hitung kekurangan
+        bulanan: Array(12).fill(0)
+    };
+
     try {
         const { data, error } = await _supabase
             .from('anggaran')
@@ -55,7 +65,7 @@ async function loadMonitoringData(mode = 'RPD') {
 
         if (error) throw error;
         if (!data || data.length === 0) {
-            containerData.innerHTML = "<div style='text-align:center; padding:20px; color:orange;'>Data kosong di database Cloud.</div>";
+            containerData.innerHTML = "<div style='text-align:center; padding:20px; color:orange;'>Data kosong.</div>";
             return;
         }
 
@@ -65,6 +75,28 @@ async function loadMonitoringData(mode = 'RPD') {
             const rawData = mode === 'RPD' ? item.rpd_bulanan : item.real_bulanan;
             const bulananArr = parseBulanan(rawData);
             
+            const pagu      = item.pagu || 0;
+            const blokir    = item.blokir || 0;
+            const realTotal = item.real_total || 0;
+            const rpdTotal  = item.rpd_total || 0;
+            const totalTampil = mode === 'RPD' ? rpdTotal : realTotal;
+
+            // Logika Sisa & Kekurangan
+            const sisa = pagu - blokir - realTotal;
+            const kekurangan = pagu - rpdTotal;
+
+            // 2. Tambahkan nilai ke Grand Total (Hanya Level 3 agar tidak double hitung jika ada parent)
+            // Jika Anda ingin menjumlahkan SEMUA baris, hapus kondisi if(item.level === 3)
+            if (item.level === 3) {
+                grandTotal.pagu += pagu;
+                grandTotal.blokir += blokir;
+                grandTotal.totalTampil += totalTampil;
+                grandTotal.realTotal += realTotal;
+                grandTotal.rpdTotal += rpdTotal;
+                bulananArr.forEach((v, i) => grandTotal.bulanan[i] += v);
+            }
+
+            // Render Baris
             const row = document.createElement('div');
             row.className = `grid-row lvl-${item.level}`;
             
@@ -74,34 +106,54 @@ async function loadMonitoringData(mode = 'RPD') {
             });
             bulanHTML += `</div>`;
 
-            // 1. Tentukan Total yang tampil di kolom TOTAL (sesuai mode RPD/REAL)
-            const totalTampil = mode === 'RPD' ? (item.rpd_total || 0) : (item.real_total || 0);
-
-            // 2. LOGIKA BARU SISA: Pagu - Blokir - Realisasi
-            // Catatan: Kita selalu menggunakan item.real_total sebagai pengurang Realisasi
-            const pagu      = item.pagu || 0;
-            const blokir    = item.blokir || 0;
-            const realisasi = item.real_total || 0; 
-            
-            const sisa = pagu - blokir - realisasi;
-
             row.innerHTML = `
                 <div class="col-kode lvl-${item.level}">${item.kode || ''}</div>
                 <div class="col-nama">${item.nama || ''}</div>
-                <div class="col-pagu">${toRp(pagu)}</div>
+                <div class="col-pagu text-right">${toRp(pagu)}</div>
                 ${bulanHTML}
-                <div class="col-total">${toRp(totalTampil)}</div>
-                <div class="col-blokir">${toRp(blokir)}</div>
-                <div class="col-sisa" style="color: ${sisa < 0 ? '#ff4d4d' : 'inherit'}; font-weight: ${sisa < 0 ? 'bold' : 'normal'};">
+                <div class="col-total text-right">${toRp(totalTampil)}</div>
+                <div class="col-blokir text-right">${toRp(blokir)}</div>
+                <div class="col-sisa text-right" style="color: ${sisa < 0 ? '#ff4d4d' : 'inherit'}; font-weight: ${sisa < 0 ? 'bold' : 'normal'};">
                     ${toRp(sisa)}
                 </div>
             `;
             containerData.appendChild(row);
         });
+
+        // 3. Update Nilai di Elemen Footer HTML
+        updateFooterDisplay(grandTotal);
         
     } catch (err) {
         console.error("Supabase Error:", err);
         containerData.innerHTML = `<div style='text-align:center; color:red; padding:20px;'>Error: ${err.message}</div>`;
+    }
+}
+
+function updateFooterDisplay(totals) {
+    const footPagu   = document.getElementById('FOOT_PAGU');
+    const footTotal  = document.getElementById('FOOT_TOTAL');
+    const footBlokir = document.getElementById('FOOT_BLOKIR');
+    const footSisa   = document.getElementById('FOOT_SISA');
+    const footGroup  = document.getElementById('FOOT_BULAN_GROUP');
+
+    if (footPagu) footPagu.innerText = toRp(totals.pagu);
+    if (footTotal) footTotal.innerText = toRp(totals.totalTampil);
+    if (footBlokir) footBlokir.innerText = toRp(totals.blokir);
+    
+    // Hitung Sisa Akhir di Footer
+    const sisaAkhir = totals.pagu - totals.blokir - totals.realTotal;
+    if (footSisa) {
+        footSisa.innerText = toRp(sisaAkhir);
+        footSisa.style.color = sisaAkhir < 0 ? '#ff4d4d' : '#afd919';
+    }
+
+    // Isi Total Bulanan di Footer
+    if (footGroup) {
+        let html = "";
+        totals.bulanan.forEach(v => {
+            html += `<span>${toRp(v)}</span>`;
+        });
+        footGroup.innerHTML = html;
     }
 }
 // =====================================================================
