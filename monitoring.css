@@ -288,3 +288,49 @@ body, html {
     background: #3b82f6; /* Warna biru agar lebih kontras */
     color: #ffffff;
 }
+.footer-style {
+    background-color: #f9f1f1; 
+    border-top: 2px solid #666967;
+    padding: 0; /* Ubah ke 0 agar padding mengikuti .grid-row > div */
+    margin-top: 5px;
+    position: sticky; 
+    bottom: 0;
+    font-size: 11px;
+    font-weight: 800;
+    z-index: 100; /* Pastikan di atas data saat scroll */
+}
+
+/* Pastikan kolom-kolom angka di footer punya lebar yang pas */
+#FOOT_PAGU {
+    width: 100px;
+    justify-content: flex-end; /* Paksa teks ke kanan */
+}
+
+#FOOT_TOTAL {
+    width: 100px;
+    justify-content: flex-end;
+}
+
+#FOOT_BLOKIR {
+    width: 100px;
+    justify-content: flex-end;
+}
+
+#FOOT_SISA {
+    width: 130px;
+    justify-content: flex-end;
+}
+
+#FOOT_BULAN_GROUP {
+    display: flex;
+    width: 1080px; /* Samakan dengan grid-template-columns Bapak */
+    justify-content: space-around;
+    padding: 0;
+}
+
+#FOOT_BULAN_GROUP span {
+    width: 90px; /* 1080 / 12 bulan */
+    text-align: center;
+    color: #000000;
+    display: inline-block;
+}
