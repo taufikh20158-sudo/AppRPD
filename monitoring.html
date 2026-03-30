@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Monitoring RPD</title>
+    <title>Sistem Manajemen Luarbiasa</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -36,14 +36,24 @@
                     <span>JUL</span><span>AGS</span><span>SEP</span>
                     <span>OKT</span><span>NOV</span><span>DES</span>
                 </div>
-
-                <div id="HEAD_TOTAL" class="bold text-right" style="color: #4ade80;">TOTAL</div>
-                <div id="HEAD_BLOKIR" class="bold text-right" style="color: #e80a0a;">BLOKIR</div>
-                <div id="HEAD_SISA" class="bold text-right" style="color: #afd919;">SISA DANA</div>
+                <div id="HEAD_TOTAL" class="bold text-right">TOTAL</div>
+                <div id="HEAD_BLOKIR" class="bold text-right">BLOKIR</div>
+                <div id="HEAD_SISA" class="bold text-right">SISA DANA</div>
             </div>
         </div>
 
         <div id="CON2"></div>
+            <div id="FOOTER_BAR" class="grid-row footer-style">
+                <div class="col-kode bold"></div>
+                <div class="col-nama bold"></div>
+                <div id="FOOT_PAGU" class="bold text-right">0</div>
+            
+                <div id="FOOT_BULAN_GROUP">
+                </div>
+                <div id="FOOT_TOTAL" class="bold text-right">0</div>
+                <div id="FOOT_BLOKIR" class="bold text-right">0</div>
+                <div id="FOOT_SISA" class="bold text-right">0</div>
+            </div>
     </main>
     <script src="monitoring.js"></script>
 </body>            
