@@ -841,12 +841,17 @@ document.getElementById('dashPeriodSelect').onchange = function() {
 function updateDashboardStats(period) {
     const rows = document.querySelectorAll('#tableBody tr');
     let stats = {
-        peg: { rpd: 0, real: 0 }, bar: { rpd: 0, real: 0 }, mod: { rpd: 0, real: 0 },
-        rm:  { rpd: 0, real: 0 }, pnp: { rpd: 0, real: 0 }
+        peg: { rpd: 0, real: 0 }, 
+        bar: { rpd: 0, real: 0 }, 
+        mod: { rpd: 0, real: 0 },
+        rm:  { rpd: 0, real: 0 }, 
+        pnp: { rpd: 0, real: 0 },
+        // Khusus Belanja Barang (52)
+        bbrm: { rpd: 0, real: 0 }, 
+        bbpnpb: { rpd: 0, real: 0 }
     };
 
     rows.forEach((row) => {
-        // FILTER KEMBALI KE LEVEL 3
         if (row.getAttribute('data-level') !== "3") return;
 
         const kodeFull = row.cells[1].innerText.trim().toUpperCase();
@@ -859,13 +864,13 @@ function updateDashboardStats(period) {
             const pIdx = parseInt(period);
             const arrRPD = JSON.parse(row.dataset.rpdBulanan || "[]");
             const arrReal = JSON.parse(row.dataset.realisasiBulanan || "[]");
-            
             vRPD = arrRPD[pIdx] || 0;
             vReal = arrReal[pIdx] || 0;
         }
 
         const kodeStr = String(kodeFull);
 
+        // 1. Klasifikasi Jenis Belanja
         if (kodeStr.startsWith("51")) { 
             stats.peg.rpd += vRPD; 
             stats.peg.real += vReal; 
@@ -873,13 +878,29 @@ function updateDashboardStats(period) {
         else if (kodeStr.startsWith("52")) { 
             stats.bar.rpd += vRPD; 
             stats.bar.real += vReal; 
+            
+            // Filter Khusus BBRM & BBPNBP (Hanya untuk akun 52)
+            if (kodeStr.endsWith("R")) {
+                stats.bbrm.rpd += vRPD;
+                stats.bbrm.real += vReal;
+            } else if (kodeStr.endsWith("P")) {
+                stats.bbpnpb.rpd += vRPD;
+                stats.bbpnpb.real += vReal;
+            }
         } 
         else if (kodeStr.startsWith("53")) { 
             stats.mod.rpd += vRPD; 
             stats.mod.real += vReal; 
         }
-        if (kodeFull.includes("R")) { stats.rm.rpd += vRPD; stats.rm.real += vReal; }
-        else if (kodeFull.includes("P")) { stats.pnp.rpd += vRPD; stats.pnp.real += vReal; }
+
+        // 2. Klasifikasi Sumber Dana (Total Keseluruhan)
+        if (kodeStr.endsWith("R")) { 
+            stats.rm.rpd += vRPD; 
+            stats.rm.real += vReal; 
+        } else if (kodeStr.endsWith("P")) { 
+            stats.pnp.rpd += vRPD; 
+            stats.pnp.real += vReal; 
+        }
     });
 
     renderDashboardUI(stats);
@@ -901,11 +922,16 @@ function renderDashboardUI(stats) {
         if (elPersen) elPersen.innerText = prs.toFixed(2) + "%";
     };
 
+    // Render baris sesuai ID di HTML Bapak
     renderRow("dashPeg", stats.peg);
     renderRow("dashBar", stats.bar);
     renderRow("dashMod", stats.mod);
     renderRow("dashRM", stats.rm);
     renderRow("dashPNBP", stats.pnp);
+    
+    // Baris tambahan yang baru Bapak masukkan
+    renderRow("dashBBRM", stats.bbrm);
+    renderRow("dashBBPNBP", stats.bbpnpb);
 
     // Update Monitor Utama Atas
     const tTotalRPD = stats.peg.rpd + stats.bar.rpd + stats.mod.rpd;
