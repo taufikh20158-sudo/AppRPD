@@ -1,6 +1,8 @@
 /**
- * RPD_REPORT_SYSTEM_V1.0
- * Fokus: Hanya data Rencana Penarikan Dana (RPD)
+ * RPD_REPORT_SYSTEM_V1.2 - HYBRID LOGIC
+ * Logika: 
+ * - Bulan Lewat & Berjalan: Pakai REALISASI
+ * - Bulan Belum Berjalan: Pakai RPD
  */
 
 const { createClient } = window.supabase;
@@ -17,14 +19,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function loadAndFillReport() {
     try {
-        // 1. Ambil data Level 3 dari database (Kategori 51, 52, 53)
+        // Ambil data dari Supabase
         const { data, error } = await _supabase
             .from('anggaran')
-            .select('kode, nama, pagu, blokir, rpd_bulanan, level')
+            .select('kode, nama, pagu, blokir, rpd_bulanan, real_bulanan, level')
             .eq('level', 3);
 
         if (error) throw error;
         if (!data || data.length === 0) return;
+
+        // Mendapatkan bulan saat ini (0 = Jan, 3 = April, dst)
+        const currentMonth = new Date().getMonth(); 
 
         const tbody = document.getElementById('reportTableBody');
         const rows = tbody.querySelectorAll('tr[data-level="3"]');
@@ -40,42 +45,38 @@ async function loadAndFillReport() {
 
         rows.forEach(row => {
             const label = row.cells[0].innerText.trim().toUpperCase();
-            let prefix = "";
-            
-            if (label.includes("PEGAWAI")) prefix = "51";
-            else if (label.includes("BARANG")) prefix = "52";
-            else if (label.includes("MODAL")) prefix = "53";
+            let prefix = label.includes("PEGAWAI") ? "51" : label.includes("BARANG") ? "52" : "53";
 
-            // Filter item berdasarkan prefix kode baris
             const categoryData = data.filter(item => String(item.kode).startsWith(prefix));
 
-            let totalPagu = 0;
-            let totalBlokir = 0;
-            let rowRM = Array(12).fill(0);
-            let rowPNBP = Array(12).fill(0);
+            let totalPagu = 0, totalBlokir = 0;
+            let rowRM = Array(12).fill(0), rowPNBP = Array(12).fill(0);
 
             categoryData.forEach(item => {
                 const kode = String(item.kode).toUpperCase();
-                let rpd = item.rpd_bulanan;
-                
-                // Pastikan RPD dibaca sebagai array
-                if (typeof rpd === 'string') {
-                    try { rpd = JSON.parse(rpd); } catch(e) { rpd = []; }
-                }
-                if (!Array.isArray(rpd)) rpd = new Array(12).fill(0);
+                const rpdArr = Array.isArray(item.rpd_bulanan) ? item.rpd_bulanan : new Array(12).fill(0);
+                const realArr = Array.isArray(item.real_bulanan) ? item.real_bulanan : new Array(12).fill(0);
 
                 totalPagu += parseFloat(item.pagu) || 0;
                 totalBlokir += parseFloat(item.blokir) || 0;
 
-                // Pisahkan RM dan PNBP hanya dari data RPD
                 for (let i = 0; i < 12; i++) {
-                    const nilaiRPD = parseFloat(rpd[i]) || 0;
+                    const vRPD = parseFloat(rpdArr[i]) || 0;
+                    const vReal = parseFloat(realArr[i]) || 0;
+
+                    /**
+                     * PENERAPAN LOGIKA BARU:
+                     * i <= currentMonth: Bulan lewat atau sedang berjalan -> Pakai Realisasi
+                     * i > currentMonth: Bulan belum berjalan -> Pakai RPD
+                     */
+                    const nilaiFinal = (i <= currentMonth) ? vReal : vRPD;
+
                     if (kode.endsWith('R')) {
-                        rowRM[i] += nilaiRPD;
-                        grandTotals.monthsRM[i] += nilaiRPD;
+                        rowRM[i] += nilaiFinal;
+                        grandTotals.monthsRM[i] += nilaiFinal;
                     } else if (kode.endsWith('P')) {
-                        rowPNBP[i] += nilaiRPD;
-                        grandTotals.monthsPNBP[i] += nilaiRPD;
+                        rowPNBP[i] += nilaiFinal;
+                        grandTotals.monthsPNBP[i] += nilaiFinal;
                     }
                 }
             });
@@ -85,24 +86,23 @@ async function loadAndFillReport() {
             row.cells[2].innerText = toRp(totalBlokir);
             row.cells[3].innerText = toRp(totalNeto);
 
-            // Perhitungan Akumulasi Progres RPD per Baris
-            let akumulasiRPDBaris = 0;
-
+            let akumulasiHybridBaris = 0;
             for (let i = 0; i < 12; i++) {
                 const startCol = 4 + (i * 4);
-                const rpdBulanIni = rowRM[i] + rowPNBP[i];
-                akumulasiRPDBaris += rpdBulanIni;
+                const totalBulanIni = rowRM[i] + rowPNBP[i];
+                akumulasiHybridBaris += totalBulanIni;
                 
                 const persenProgres = totalNeto > 0 
-                    ? ((akumulasiRPDBaris / totalNeto) * 100).toFixed(2) + '%' 
+                    ? ((akumulasiHybridBaris / totalNeto) * 100).toFixed(2) + '%' 
                     : '0.00%';
 
+                // Tampilkan nilai di tabel
                 row.cells[startCol].innerText = toRp(rowRM[i]);
                 row.cells[startCol + 1].innerText = toRp(rowPNBP[i]);
-                row.cells[startCol + 2].innerText = toRp(rpdBulanIni);
+                row.cells[startCol + 2].innerText = toRp(totalBulanIni);
                 row.cells[startCol + 3].innerText = persenProgres; 
 
-                grandTotals.monthsTotal[i] += rpdBulanIni;
+                grandTotals.monthsTotal[i] += totalBulanIni;
             }
 
             grandTotals.pagu += totalPagu;
@@ -113,7 +113,7 @@ async function loadAndFillReport() {
         updateFooter(grandTotals);
 
     } catch (err) {
-        console.error("RPD Load Error:", err.message);
+        console.error("RPD Hybrid Load Error:", err.message);
     }
 }
 
@@ -125,15 +125,14 @@ function updateFooter(totals) {
     footer.cells[2].innerText = toRp(totals.blokir);
     footer.cells[3].innerText = toRp(totals.neto);
 
-    let akumulasiRPDFooter = 0;
-
+    let akumulasiHybridFooter = 0;
     for (let i = 0; i < 12; i++) {
         const colIdx = 4 + (i * 4);
         const totalBulanIni = totals.monthsTotal[i];
-        akumulasiRPDFooter += totalBulanIni;
+        akumulasiHybridFooter += totalBulanIni;
 
         const persenProgresTotal = totals.neto > 0 
-            ? ((akumulasiRPDFooter / totals.neto) * 100).toFixed(2) + '%' 
+            ? ((akumulasiHybridFooter / totals.neto) * 100).toFixed(2) + '%' 
             : '0.00%';
 
         footer.cells[colIdx].innerText = toRp(totals.monthsRM[i]);
