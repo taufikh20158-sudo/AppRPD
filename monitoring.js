@@ -82,7 +82,7 @@ async function loadMonitoringData(mode = 'RPD') {
             const totalTampil = mode === 'RPD' ? rpdTotal : realTotal;
 
             // Logika Sisa & Kekurangan
-            const sisa = pagu - blokir - realTotal;
+            const sisa = pagu - blokir - totalTampil;
             const kekurangan = pagu - rpdTotal;
 
             // 2. Tambahkan nilai ke Grand Total (Hanya Level 3 agar tidak double hitung jika ada parent)
@@ -141,7 +141,7 @@ function updateFooterDisplay(totals) {
     if (footBlokir) footBlokir.innerText = toRp(totals.blokir);
     
     // Hitung Sisa Akhir di Footer
-    const sisaAkhir = totals.pagu - totals.blokir - totals.realTotal;
+    const sisaAkhir = totals.pagu - totals.blokir - totals.totalTampil;
     if (footSisa) {
         footSisa.innerText = toRp(sisaAkhir);
         footSisa.style.color = sisaAkhir < 0 ? '#ff4d4d' : '#afd919';
