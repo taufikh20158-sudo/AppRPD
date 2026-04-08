@@ -759,3 +759,17 @@ tr.row-selected:hover {
 .btn-close-bottom:active {
     border: 1px inset #000;
 }
+.total-container-led {
+    text-align: right;
+    background-color: #3c00ff; /* Hitam */
+    padding: 8px 15px;
+    border: 3px double #808080;
+    border-radius: 2px;
+}
+
+#totalRencanaBulan {
+    font-size: 30px;
+    font-weight: bold;
+    color: #0606ac; /* Hijau fosfor */
+    text-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
+}
