@@ -1077,3 +1077,164 @@ async function logoutAplikasi() {
         window.location.replace('login.html');
     }
 }
+// ================ PLAN ====================
+
+document.addEventListener('DOMContentLoaded', () => {
+    const modalPlan = document.getElementById('modalPlan');
+    const btnPlan = document.getElementById('btnPlan'); // Tombol PLAN di toolbar
+    const closePlan = document.getElementById('closePlan');
+    const btnDonePlan = document.getElementById('btnDonePlan');
+    const filterBulan = document.getElementById('filterBulan');
+
+    // 1. Fungsi Buka Modal
+    btnPlan.addEventListener('click', () => {
+        modalPlan.style.display = 'block';
+        // Set default ke bulan berjalan saat dibuka
+        const bulanSekarang = new Date().getMonth();
+        filterBulan.value = bulanSekarang;
+        
+        renderPlanByMonth(bulanSekarang);
+    });
+
+    // 2. Fungsi Tutup Modal (Tanda Silang)
+    closePlan.addEventListener('click', () => {
+        modalPlan.style.display = 'none';
+    });
+
+    // 3. Fungsi Tutup Modal (Tombol Selesai)
+    btnDonePlan.addEventListener('click', () => {
+        modalPlan.style.display = 'none';
+    });
+
+    // 4. Tutup Modal jika klik di luar area modal
+    window.addEventListener('click', (event) => {
+        if (event.target == modalPlan) {
+            modalPlan.style.display = 'none';
+        }
+    });
+
+    // 5. Event Listener ketika filter bulan diganti
+    filterBulan.addEventListener('change', (e) => {
+        renderPlanByMonth(e.target.value);
+    });
+});
+
+/**
+ * Fungsi untuk memproses data dari Supabase ke dalam Modal
+ * (Ini adalah kerangka, nanti kita isi dengan fetch data)
+ */
+async function renderPlanByMonth(indexBulan) {
+    const container = document.getElementById('planContainer');
+    container.innerHTML = `<div style="text-align:center; padding:20px;">Memuat Rencana...</div>`;
+
+    try {
+        // Logika ambil data dari Supabase (Mirip dengan loadMonitoringData)
+        // Kita akan filter berdasarkan rpd_bulanan[indexBulan] > 0
+        
+        // container.innerHTML = ""; // Bersihkan loading
+        // render baris-baris sesuai level...
+        
+    } catch (err) {
+        console.error("Gagal load plan:", err);
+    }
+}
+/**
+ * Render data ke dalam modal PLAN dengan hirarki Level 2, 3, dan 4
+ * @param {number} monthIndex - Indeks bulan (0-11)
+ */
+async function renderPlanByMonth(monthIndex) {
+    const container = document.getElementById('planContainer');
+    const totalDisplay = document.getElementById('totalRencanaBulan'); // Ambil elemen total
+    
+    container.innerHTML = `<div style="padding:20px; font-family:Tahoma; font-size:12px;">Searching records...</div>`;
+    totalDisplay.innerText = "Rp 0"; // Reset total setiap kali ganti bulan
+
+    try {
+        const { data, error } = await _supabase
+            .from('anggaran')
+            .select('kode, nama, level, rpd_bulanan, sort_order')
+            .in('level', [0, 2, 4])
+            .order('sort_order', { ascending: true });
+
+        if (error) throw error;
+
+        const getVal = (item) => {
+            const arr = Array.isArray(item.rpd_bulanan) ? item.rpd_bulanan : new Array(12).fill(0);
+            return parseFloat(arr[monthIndex]) || 0;
+        };
+
+        // --- TAHAP 1: Mapping Hirarki & Hitung Grand Total ---
+        let mapData = [];
+        let currentL0 = null;
+        let currentL2 = null;
+        let grandTotalBulan = 0; // Variabel penampung total akhir
+
+        data.forEach(item => {
+            if (item.level === 0) {
+                currentL0 = { ...item, childrenL2: [] };
+                mapData.push(currentL0);
+            } else if (item.level === 2) {
+                currentL2 = { ...item, childrenL4: [], totalL4: 0 };
+                if (currentL0) currentL0.childrenL2.push(currentL2);
+            } else if (item.level === 4) {
+                const val = getVal(item);
+                if (val > 0 && currentL2) {
+                    currentL2.childrenL4.push({ ...item, val });
+                    currentL2.totalL4 += val;
+                    grandTotalBulan += val; // Tambahkan ke total keseluruhan
+                }
+            }
+        });
+
+        // Update tampilan Grand Total di atas
+        totalDisplay.innerText = toRp(grandTotalBulan);
+
+        // --- TAHAP 2: Render (Logika sama seperti sebelumnya) ---
+        container.innerHTML = ""; 
+
+        mapData.forEach(l0 => {
+            const hasContent = l0.childrenL2.some(l2 => l2.childrenL4.length > 0);
+            if (hasContent) {
+                const div0 = document.createElement('div');
+                div0.className = 'row-lvl-0';
+                div0.innerHTML = `<span>${l0.nama}</span>`;
+                container.appendChild(div0);
+
+                l0.childrenL2.forEach(l2 => {
+                    if (l2.childrenL4.length > 0) {
+                        const group = document.createElement('div');
+                        group.className = 'plan-group';
+                        group.style = "margin-bottom: 15px; padding-bottom: 5px;";
+
+                        const div2 = document.createElement('div');
+                        div2.className = 'row-lvl-2';
+                        div2.innerHTML = `
+                            <span>${l2.kode} ${l2.nama}</span>
+                            <span class="nilai">${toRp(l2.totalL4)}</span>
+                        `;
+                        group.appendChild(div2);
+
+                        l2.childrenL4.forEach(l4 => {
+                            const div4 = document.createElement('div');
+                            div4.className = 'row-lvl-4';
+                            div4.innerHTML = `
+                                <span>${l4.kode} ${l4.nama}</span>
+                                <span class="nilai">${toRp(l4.val)}</span>
+                            `;
+                            group.appendChild(div4);
+                        });
+                        container.appendChild(group);
+                    }
+                });
+            }
+        });
+
+        if (grandTotalBulan === 0) {
+            container.innerHTML = "<div style='padding:40px; text-align:center; color:#808080; font-family:Tahoma; font-size:12px;'>-- Tidak ada rincian kegiatan --</div>";
+        }
+
+    } catch (err) {
+        console.error("Error:", err);
+        container.innerHTML = `<div style="color:red; padding:20px; font-family:Tahoma;">Gagal memuat: ${err.message}</div>`;
+    }
+}
