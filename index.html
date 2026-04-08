@@ -71,11 +71,11 @@
                 <button type="button" class="btn-tool-danger" id="btnDelete">DELETE</button>
                 <button type="button" class="btn-tool-alt" id="btnAddRow">TAMBAH</button>
                 <button type="button" class="btn-tool" id="btnInput">INPUT</button>
-                <button type="button" class="btn-tool" id="btnPDF">PDF</button>
                 <button type="button" class="btn-tool" id="btnEdit">EDIT</button>
                 <button type="button" class="btn-tool" id="btnRPD">RPD</button>
                 <button type="button" class="btn-tool" id="btnRealisasi">REALISASI</button>
                 <button type="button" class="btn-tool" id="btnDasboard">DASBOARD</button>
+                <button type="button" class="btn-tool" id="btnPlan">PLAN</button>
                 <button type="button" class="btn-tool" id="btnMonitoring" onclick="window.open('monitoring.html', '_blank')">
                     MONITORING
                 </button>
@@ -354,6 +354,43 @@
         <div class="modal-footer">
             <button class="btn-simpan" id="btnSubmitInput" style="background-color: #2ecc71;color: white;">SIMPAN</button>
             <button class="btn-batal" id="btnCancelInput" style="background-color: #e74c3c;color : white;">BATAL</button>
+        </div>
+    </div>
+</div>
+<div id="modalPlan" class="modal-plan">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Rencana Kegiatan - Balmon Palangkaraya</h2>
+            <div class="close-modal" id="closePlan">x</div>
+        </div>
+
+        <div style="padding: 10px; background: #c0c0c0; border-bottom: 1px solid #808080;">
+            <label style="font-size: 12px; color: black;"></label>
+            <select id="filterBulan" class="select-bulan">
+                <option value="0">Januari</option>
+                <option value="1">Februari</option>
+                <option value="2">Maret</option>
+                <option value="3">April</option>
+                <option value="4">Mei</option>
+                <option value="5">Juni</option>
+                <option value="6">Juli</option>
+                <option value="7">Agustus</option>
+                <option value="8">September</option>
+                <option value="9">Oktober</option>
+                <option value="10">November</option>
+                <option value="11">Desember</option>
+            </select>
+             <div style="text-align: right;">
+                <div id="totalRencanaBulan" style="font-size: 30px; font-weight: bold; color: #070707;">Rp 0</div>
+            </div>
+        </div>
+        <div class="modal-body">
+            <div id="planContainer">
+                </div>
+        </div>
+
+        <div class="modal-footer" style="padding: 10px; background: #c0c0c0; text-align: right;">
+            <button type="button" class="btn-close-bottom" id="btnDonePlan">OK</button>
         </div>
     </div>
 </div>
