@@ -186,8 +186,6 @@ async function exportToPDF() {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF('l', 'mm', 'a2'); 
 
-    // 1. Tentukan Judul Berdasarkan Konteks (Gunakan variabel global atau cek state data)
-    // Asumsi: Anda memiliki variabel global 'currentMode' atau cek dari teks UI
     const reportTitle = (typeof currentMode !== 'undefined' && currentMode === 'REAL')
         ? "REALISASI PENARIKAN DANA BULANAN" 
         : "RENCANA PENARIKAN DANA ( RPD ) BULANAN";
@@ -196,28 +194,64 @@ async function exportToPDF() {
     const tableData = [];
     const rows = document.querySelectorAll('#CON2 .grid-row');
 
+    let grandTotalPagu = 0, grandTotalSemua = 0, grandTotalBlokir = 0, grandTotalSisa = 0;
+    let grandTotalBulanan = Array(12).fill(0);
+
+    const parseNum = (txt) => {
+        if (!txt) return 0;
+        return parseFloat(txt.replace(/\./g, '').replace(/,/g, '.')) || 0;
+    };
+
     rows.forEach(row => {
         const rowData = [];
-        rowData.push(row.querySelector('.col-kode')?.innerText || "");
-        rowData.push(row.querySelector('.col-nama')?.innerText || "");
-        rowData.push(row.querySelector('.col-pagu')?.innerText || "");
-        row.querySelectorAll('.input-bulan-cell').forEach(cell => rowData.push(cell.innerText || "0"));
-        rowData.push(row.querySelector('.col-total')?.innerText || "0");
-        rowData.push(row.querySelector('.col-blokir')?.innerText || "0");
-        rowData.push(row.querySelector('.col-sisa')?.innerText || "0");
+        const isLevel0 = row.classList.contains('lvl-0'); 
+        
+        const kode = row.querySelector('.col-kode')?.innerText || "";
+        const nama = row.querySelector('.col-nama')?.innerText || "";
+        const paguText = row.querySelector('.col-pagu')?.innerText || "0";
+        const totalText = row.querySelector('.col-total')?.innerText || "0";
+        const blokirText = row.querySelector('.col-blokir')?.innerText || "0";
+        const sisaText = row.querySelector('.col-sisa')?.innerText || "0";
+        
+        rowData.push(kode, nama, paguText);
+
+        row.querySelectorAll('.input-bulan-cell').forEach((cell, idx) => {
+            const valText = cell.innerText || "0";
+            rowData.push(valText);
+            if (isLevel0) grandTotalBulanan[idx] += parseNum(valText);
+        });
+
+        rowData.push(totalText, blokirText, sisaText);
         tableData.push(rowData);
+
+        if (isLevel0) {
+            grandTotalPagu += parseNum(paguText);
+            grandTotalSemua += parseNum(totalText);
+            grandTotalBlokir += parseNum(blokirText);
+            grandTotalSisa += parseNum(sisaText);
+        }
     });
 
-    // 2. Render Tabel dengan Header di Setiap Halaman
+    const footerRow = [
+        "", "", 
+        grandTotalPagu.toLocaleString('id-ID'),
+        ...grandTotalBulanan.map(v => v.toLocaleString('id-ID')),
+        grandTotalSemua.toLocaleString('id-ID'),
+        grandTotalBlokir.toLocaleString('id-ID'),
+        grandTotalSisa.toLocaleString('id-ID')
+    ];
+
     doc.autoTable({
         head: headers,
         body: tableData,
+        foot: [footerRow],
+        showFoot: 'lastPage', // KUNCI: Total hanya muncul di halaman paling akhir
         startY: 40,
         theme: 'grid',
         styles: { fontSize: 8, cellPadding: 2 },
         headStyles: { fillColor: [225, 29, 72] },
+        footStyles: { fillColor: [230, 230, 230], textColor: 0, fontStyle: 'bold', halign: 'right' },
         columnStyles: {
-            1: { cellWidth: 'auto' },
             2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' },
             5: { halign: 'right' }, 6: { halign: 'right' }, 7: { halign: 'right' },
             8: { halign: 'right' }, 9: { halign: 'right' }, 10: { halign: 'right' },
@@ -225,49 +259,41 @@ async function exportToPDF() {
             14: { halign: 'right' }, 15: { halign: 'right' }, 16: { halign: 'right' },
             17: { halign: 'right' }
         },
-        // Fungsi ini dipanggil setiap kali halaman baru dibuat
         didDrawPage: (data) => {
-            doc.setFontSize(18);
-            doc.setFont("helvetica", "bold");
+            doc.setFontSize(18).setFont("helvetica", "bold");
             doc.text(reportTitle, data.settings.margin.left, 20);
-            
-            doc.setFontSize(11);
-            doc.setFont("helvetica", "normal");
+            doc.setFontSize(11).setFont("helvetica", "normal");
             doc.text("Laporan Anggaran Tahun 2026", data.settings.margin.left, 28);
             doc.text(`Halaman ${doc.internal.getNumberOfPages()}`, doc.internal.pageSize.getWidth() - 40, 20);
         },
-        margin: { top: 40 }
+        margin: { top: 40, bottom: 20 }
     });
 
-    // 3. Logika Footer (Tanda Tangan) - Muncul di Halaman Terakhir
-    const finalY = doc.lastAutoTable.finalY;
-    const pageWidth = doc.internal.pageSize.getWidth();
+    // LOGIKA TANDA TANGAN YANG AMAN
+    let finalY = doc.lastAutoTable.finalY; 
     const pageHeight = doc.internal.pageSize.getHeight();
-    const signX = pageWidth - 120; // Posisi horizontal tanda tangan
+    const signX = doc.internal.pageSize.getWidth() - 120;
 
-    // Jika sisa ruang di bawah tabel tidak cukup untuk tanda tangan (butuh sekitar 60mm)
-    // maka pindah ke halaman baru
-    if (finalY + 60 > pageHeight) {
+    // Jika jarak ke bawah kertas kurang dari 70mm, buat halaman baru khusus TTD
+    if (finalY + 70 > pageHeight) {
         doc.addPage();
-        var currentY = 40; // Mulai dari atas di halaman baru
+        finalY = 40; 
     } else {
-        var currentY = finalY + 20;
+        finalY += 20; 
     }
 
     const opsiTanggal = { day: 'numeric', month: 'long', year: 'numeric' };
     const tanggalCetak = new Intl.DateTimeFormat('id-ID', opsiTanggal).format(new Date());
 
-    doc.setFontSize(12);
-    doc.setFont("helvetica", "normal");
-    doc.text(`Palangka Raya, ${tanggalCetak}`, signX, currentY);
-    doc.text("Analis Anggaran Ahli Pertama", signX, currentY + 8);
+    doc.setFontSize(12).setFont("helvetica", "normal");
+    doc.text(`Palangka Raya, ${tanggalCetak}`, signX, finalY);
+    doc.text("Analis Anggaran Ahli Pertama", signX, finalY + 8);
     
     doc.setFont("helvetica", "bold");
-    doc.text("Taufik Hidayat", signX, currentY + 38);
+    doc.text("Taufik Hidayat", signX, finalY + 40);
     
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(11);
-    doc.text("199604092025041002", signX, currentY + 45);
+    doc.setFont("helvetica", "normal").setFontSize(11);
+    doc.text("199604092025041002", signX, finalY + 47);
 
     doc.save(`Laporan_Monitoring.pdf`);
 }
