@@ -827,9 +827,22 @@ function updateDashboardTotal() {
 // =====================================================================
 document.getElementById('btnDasboard').onclick = function() {
     document.getElementById('dashboardOverlay').style.display = 'flex';
-    updateDashboardStats("TAHUNAN");
+    
+    const bulanSekarangIndex = new Date().getMonth();
+    const daftarBulan = [
+        "JANUARI", "FEBRUARI", "MARET", "APRIL", "MEI", "JUNI", 
+        "JULI", "AGUSTUS", "SEPTEMBER", "OKTOBER", "NOVEMBER", "DESEMBER"
+    ];
+    const bulanSekarangTeks = daftarBulan[bulanSekarangIndex];
+    
+    // Set nilai dropdown ke nama teks bulan berjalan
+    const filterBulanDash = document.getElementById('filterBulanDashboard'); 
+    if (filterBulanDash) {
+        filterBulanDash.value = bulanSekarangTeks;
+    }
+    
+    updateDashboardStats(bulanSekarangTeks);
 };
-
 document.getElementById('btnCloseDashboard').onclick = function() {
     document.getElementById('dashboardOverlay').style.display = 'none';
 };
