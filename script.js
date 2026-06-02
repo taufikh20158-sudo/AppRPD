@@ -1243,3 +1243,4 @@ async function renderPlanByMonth(monthIndex) {
         container.innerHTML = `<div style="color:red; padding:20px; font-family:Tahoma;">Gagal memuat: ${err.message}</div>`;
     }
 }
+document.getElementById('btnDownloadPDF').onclick = exportToPDF;
