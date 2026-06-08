@@ -1083,118 +1083,140 @@ async function logoutAplikasi() {
     }
 }
 // ================ PLAN ====================
-
 document.addEventListener('DOMContentLoaded', () => {
     const modalPlan = document.getElementById('modalPlan');
-    const btnPlan = document.getElementById('btnPlan'); // Tombol PLAN di toolbar
+    const btnPlan = document.getElementById('btnPlan'); 
     const closePlan = document.getElementById('closePlan');
     const btnDonePlan = document.getElementById('btnDonePlan');
     const filterBulan = document.getElementById('filterBulan');
+    const chkJenis = document.querySelectorAll('.chk-jenis');
 
-    // 1. Fungsi Buka Modal
     btnPlan.addEventListener('click', () => {
         modalPlan.style.display = 'block';
-        // Set default ke bulan berjalan saat dibuka
         const bulanSekarang = new Date().getMonth();
         filterBulan.value = bulanSekarang;
+        
+        chkJenis.forEach(chk => {
+            chk.checked = true;
+        });
         
         renderPlanByMonth(bulanSekarang);
     });
 
-    // 2. Fungsi Tutup Modal (Tanda Silang)
     closePlan.addEventListener('click', () => {
         modalPlan.style.display = 'none';
     });
 
-    // 3. Fungsi Tutup Modal (Tombol Selesai)
     btnDonePlan.addEventListener('click', () => {
         modalPlan.style.display = 'none';
     });
 
-    // 4. Tutup Modal jika klik di luar area modal
     window.addEventListener('click', (event) => {
         if (event.target == modalPlan) {
             modalPlan.style.display = 'none';
         }
     });
 
-    // 5. Event Listener ketika filter bulan diganti
     filterBulan.addEventListener('change', (e) => {
         renderPlanByMonth(e.target.value);
     });
+
+    chkJenis.forEach(chk => {
+        chk.addEventListener('change', () => {
+            renderPlanByMonth(filterBulan.value);
+        });
+    });
+    // Listener untuk tombol PDF
+const btnDownloadPDF = document.getElementById('btnDownloadPDF');
+btnDownloadPDF.addEventListener('click', () => {
+    const bulanIndex = filterBulan.value;
+    const namaBulan = filterBulan.options[filterBulan.selectedIndex].text;
+    unduhPDFPlan(bulanIndex, namaBulan);
+});
 });
 
-/**
- * Fungsi untuk memproses data dari Supabase ke dalam Modal
- * (Ini adalah kerangka, nanti kita isi dengan fetch data)
- */
-async function renderPlanByMonth(indexBulan) {
-    const container = document.getElementById('planContainer');
-    container.innerHTML = `<div style="text-align:center; padding:20px;">Memuat Rencana...</div>`;
-
-    try {
-        // Logika ambil data dari Supabase (Mirip dengan loadMonitoringData)
-        // Kita akan filter berdasarkan rpd_bulanan[indexBulan] > 0
-        
-        // container.innerHTML = ""; // Bersihkan loading
-        // render baris-baris sesuai level...
-        
-    } catch (err) {
-        console.error("Gagal load plan:", err);
+function dapatkanJenisBelanja(kode) {
+    const clean = String(kode).trim().toUpperCase();
+    
+    if (clean.startsWith('51') && clean.includes('R')) return 'PEGAWAI';
+    if (clean.startsWith('52')) {
+        if (clean.includes('P')) return 'BARANG_PNBP';
+        if (clean.includes('R')) return 'BARANG_RM';
     }
+    if (clean.startsWith('53') && clean.includes('P')) return 'MODAL';
+    
+    return '';
 }
-/**
- * Render data ke dalam modal PLAN dengan hirarki Level 2, 3, dan 4
- * @param {number} monthIndex - Indeks bulan (0-11)
- */
+
 async function renderPlanByMonth(monthIndex) {
     const container = document.getElementById('planContainer');
-    const totalDisplay = document.getElementById('totalRencanaBulan'); // Ambil elemen total
+    const totalDisplay = document.getElementById('totalRencanaBulan'); 
+    const chkJenis = document.querySelectorAll('.chk-jenis');
     
     container.innerHTML = `<div style="padding:20px; font-family:Tahoma; font-size:12px;">Searching records...</div>`;
-    totalDisplay.innerText = "Rp 0"; // Reset total setiap kali ganti bulan
+    totalDisplay.innerText = "Rp 0"; 
+
+    const jenisTerpilih = Array.from(chkJenis)
+        .filter(chk => chk.checked)
+        .map(chk => chk.value);
 
     try {
         const { data, error } = await _supabase
             .from('anggaran')
             .select('kode, nama, level, rpd_bulanan, sort_order')
-            .in('level', [0, 2, 4])
+            .in('level', [0, 2, 3, 4])
             .order('sort_order', { ascending: true });
 
         if (error) throw error;
 
         const getVal = (item) => {
-            const arr = Array.isArray(item.rpd_bulanan) ? item.rpd_bulanan : new Array(12).fill(0);
-            return parseFloat(arr[monthIndex]) || 0;
+            let arr = item.rpd_bulanan;
+            if (typeof arr === 'string') {
+                try {
+                    arr = JSON.parse(arr);
+                } catch (e) {
+                    arr = [];
+                }
+            }
+            if (!Array.isArray(arr)) {
+                arr = new Array(12).fill(0);
+            }
+            const idx = parseInt(monthIndex, 10);
+            return parseFloat(arr[idx]) || 0;
         };
 
-        // --- TAHAP 1: Mapping Hirarki & Hitung Grand Total ---
         let mapData = [];
         let currentL0 = null;
         let currentL2 = null;
-        let grandTotalBulan = 0; // Variabel penampung total akhir
+        let currentL3Cocok = false;
+        let grandTotalBulan = 0; 
 
         data.forEach(item => {
-            if (item.level === 0) {
+            const lvl = parseInt(item.level, 10);
+            
+            if (lvl === 0) {
                 currentL0 = { ...item, childrenL2: [] };
                 mapData.push(currentL0);
-            } else if (item.level === 2) {
+            } else if (lvl === 2) {
                 currentL2 = { ...item, childrenL4: [], totalL4: 0 };
-                if (currentL0) currentL0.childrenL2.push(currentL2);
-            } else if (item.level === 4) {
+                if (currentL0) {
+                    currentL0.childrenL2.push(currentL2);
+                }
+            } else if (lvl === 3) {
+                const jenisBelanja = dapatkanJenisBelanja(item.kode);
+                currentL3Cocok = jenisTerpilih.includes(jenisBelanja);
+            } else if (lvl === 4) {
                 const val = getVal(item);
-                if (val > 0 && currentL2) {
+
+                if (val > 0 && currentL2 && currentL3Cocok) {
                     currentL2.childrenL4.push({ ...item, val });
                     currentL2.totalL4 += val;
-                    grandTotalBulan += val; // Tambahkan ke total keseluruhan
+                    grandTotalBulan += val; 
                 }
             }
         });
 
-        // Update tampilan Grand Total di atas
         totalDisplay.innerText = toRp(grandTotalBulan);
-
-        // --- TAHAP 2: Render (Logika sama seperti sebelumnya) ---
         container.innerHTML = ""; 
 
         mapData.forEach(l0 => {
@@ -1240,7 +1262,181 @@ async function renderPlanByMonth(monthIndex) {
 
     } catch (err) {
         console.error("Error:", err);
-        container.innerHTML = `<div style="color:red; padding:20px; font-family:Tahoma;">Gagal memuat: ${err.message}</div>`;
+        container.innerHTML = `<div style="color:red; padding:20px; font-family:Tahoma; font-size:12px;">Gagal memuat: ${err.message || "Periksa Console F12"}</div>`;
     }
 }
-document.getElementById('btnDownloadPDF').onclick = exportToPDF;
+// ============ PDF PLAN ============== //
+async function unduhPDFPlan(monthIndex, namaBulan) {
+    const chkJenis = document.querySelectorAll('.chk-jenis');
+    const jenisTerpilih = Array.from(chkJenis)
+        .filter(chk => chk.checked)
+        .map(chk => chk.value);
+
+    if (jenisTerpilih.length === 0) {
+        alert("Silakan pilih minimal satu jenis belanja sebelum mencetak PDF.");
+        return;
+    }
+
+    try {
+        // 1. Ambil data yang sama dari Supabase
+        const { data, error } = await _supabase
+            .from('anggaran')
+            .select('kode, nama, level, rpd_bulanan, sort_order')
+            .in('level', [0, 2, 3, 4])
+            .order('sort_order', { ascending: true });
+
+        if (error) throw error;
+
+        const getVal = (item) => {
+            let arr = item.rpd_bulanan;
+            if (typeof arr === 'string') {
+                try { arr = JSON.parse(arr); } catch (e) { arr = []; }
+            }
+            if (!Array.isArray(arr)) arr = new Array(12).fill(0);
+            return parseFloat(arr[parseInt(monthIndex, 10)]) || 0;
+        };
+
+        // 2. Pemrosesan Hirarki Data
+        let mapData = [];
+        let currentL0 = null;
+        let currentL2 = null;
+        let currentL3Cocok = false;
+        let grandTotalBulan = 0;
+
+        data.forEach(item => {
+            const lvl = parseInt(item.level, 10);
+            if (lvl === 0) {
+                currentL0 = { ...item, childrenL2: [] };
+                mapData.push(currentL0);
+            } else if (lvl === 2) {
+                currentL2 = { ...item, childrenL4: [], totalL4: 0 };
+                if (currentL0) currentL0.childrenL2.push(currentL2);
+            } else if (lvl === 3) {
+                const clean = String(item.kode).trim().toUpperCase();
+                let jenisBelanja = '';
+                if (clean.startsWith('51') && clean.includes('R')) jenisBelanja = 'PEGAWAI';
+                if (clean.startsWith('52')) {
+                    if (clean.includes('P')) jenisBelanja = 'BARANG_PNBP';
+                    if (clean.includes('R')) jenisBelanja = 'BARANG_RM';
+                }
+                if (clean.startsWith('53') && clean.includes('P')) jenisBelanja = 'MODAL';
+                
+                currentL3Cocok = jenisTerpilih.includes(jenisBelanja);
+            } else if (lvl === 4) {
+                const val = getVal(item);
+                if (val > 0 && currentL2 && currentL3Cocok) {
+                    currentL2.childrenL4.push({ ...item, val });
+                    currentL2.totalL4 += val;
+                    grandTotalBulan += val;
+                }
+            }
+        });
+
+        if (grandTotalBulan === 0) {
+            alert("Tidak ada data rencana penarikan dana pada bulan dan jenis belanja ini.");
+            return;
+        }
+
+        // 3. Mulai Instansiasi jsPDF
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('p', 'pt', 'a4');
+
+        // Pengaturan Awal Dokumen
+        const marginX = 40;
+        let startY = 50;
+        const pageWidth = doc.internal.pageSize.width;
+        const limitY = doc.internal.pageSize.height - 50;
+
+        // Fungsi Helper untuk Cek Ganti Halaman Otomatis
+        const cekHalamanBaru = (tinggiElemen) => {
+            if (startY + tinggiElemen > limitY) {
+                doc.addPage();
+                startY = 50; 
+            }
+        };
+
+        // JUDUL UTAMA
+        doc.setFont("Helvetica", "bold");
+        doc.setFontSize(14);
+        doc.text("RENCANA PENARIKAN DANA (RPD)", pageWidth / 2, startY, { align: "center" });
+        startY += 20;
+
+        doc.setFontSize(12);
+        doc.text(`BULAN: ${namaBulan.toUpperCase()}`, pageWidth / 2, startY, { align: "center" });
+        startY += 30;
+
+        // GARIS PEMBATAS ATAS
+        doc.setLineWidth(1.5);
+        doc.line(marginX, startY, pageWidth - marginX, startY);
+        startY += 20;
+
+        // 4. Perulangan Cetak Data Per Level
+        mapData.forEach(l0 => {
+            const hasContent = l0.childrenL2.some(l2 => l2.childrenL4.length > 0);
+            if (!hasContent) return;
+
+            // Cetak Level 0 (Program / Kegiatan Utama)
+            cekHalamanBaru(25);
+            doc.setFont("Helvetica", "bold");
+            doc.setFontSize(11);
+            doc.setTextColor(0, 0, 0);
+            
+            // Bungkus teks panjang level 0 agar aman dari overflow kanan
+            const textL0 = doc.splitTextToSize(`${l0.nama}`, pageWidth - (marginX * 2));
+            doc.text(textL0, marginX, startY);
+            startY += (textL0.length * 14) + 5;
+
+            l0.childrenL2.forEach(l2 => {
+                if (l2.childrenL4.length === 0) return;
+
+                // Cetak Level 2 (Komponen / Sub Kegiatan)
+                cekHalamanBaru(25);
+                doc.setFont("Helvetica", "bold");
+                doc.setFontSize(10);
+                doc.setTextColor(40, 40, 40);
+
+                const textL2 = doc.splitTextToSize(`${l2.kode} ${l2.nama}`, pageWidth - (marginX * 2) - 100);
+                doc.text(textL2, marginX + 15, startY);
+                doc.text(toRp(l2.totalL4), pageWidth - marginX, startY, { align: "right" });
+                startY += (textL2.length * 13) + 5;
+
+                // Cetak Level 4 (Rincian Detail Kegiatan)
+                l2.childrenL4.forEach(l4 => {
+                    cekHalamanBaru(20);
+                    doc.setFont("Helvetica", "normal");
+                    doc.setFontSize(9);
+                    doc.setTextColor(80, 80, 80);
+
+                    const textL4 = doc.splitTextToSize(`${l4.kode} ${l4.nama}`, pageWidth - (marginX * 2) - 120);
+                    doc.text(textL4, marginX + 30, startY);
+                    doc.text(toRp(l4.val), pageWidth - marginX, startY, { align: "right" });
+                    startY += (textL4.length * 12) + 4;
+                });
+
+                startY += 5; // Spasi tipis antar grup komponen
+            });
+            startY += 10; // Spasi antar rumpun kegiatan besar
+        });
+
+        // TOTAL AKHIR (GRAND TOTAL)
+        startY += 10;
+        cekHalamanBaru(30);
+        doc.setLineWidth(1);
+        doc.setDrawColor(120, 120, 120);
+        doc.line(marginX, startY, pageWidth - marginX, startY);
+        startY += 18;
+
+        doc.setFont("Helvetica", "bold");
+        doc.setFontSize(11);
+        doc.setTextColor(0, 0, 0);
+        doc.text("TOTAL RPD BULAN INI", marginX, startY);
+        doc.text(toRp(grandTotalBulan), pageWidth - marginX, startY, { align: "right" });
+
+        // Unduh berkas PDF ke sistem user
+        doc.save(`RPD_${namaBulan}_${new Date().getFullYear()}.pdf`);
+
+    } catch (err) {
+        console.error("Gagal cetak PDF:", err);
+        alert("Gagal mencetak dokumen PDF. Silakan periksa log konsol.");
+    }
+}
