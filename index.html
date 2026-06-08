@@ -363,33 +363,54 @@
             <h2>Rencana Kegiatan - Balmon Palangkaraya</h2>
             <div class="close-modal" id="closePlan">x</div>
         </div>
+            <div style="padding: 10px; background: #c0c0c0; border-bottom: 1px solid #808080;">
+                <label style="font-size: 12px; color: black;"></label>
+                
+                <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px;">
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <select id="filterBulan" class="select-bulan" style="width: 150px; font-family: Tahoma; font-size: 12px; padding: 5px; border: 2px inset #808080; background: #fff; box-sizing: border-box;">
+                            <option value="0">Januari</option>
+                            <option value="1">Februari</option>
+                            <option value="2">Maret</option>
+                            <option value="3">April</option>
+                            <option value="4">Mei</option>
+                            <option value="5">Juni</option>
+                            <option value="6">Juli</option>
+                            <option value="7">Agustus</option>
+                            <option value="8">September</option>
+                            <option value="9">Oktober</option>
+                            <option value="10">November</option>
+                            <option value="11">Desember</option>
+                        </select>
 
-        <div style="padding: 10px; background: #c0c0c0; border-bottom: 1px solid #808080;">
-            <label style="font-size: 12px; color: black;"></label>
-                <select id="filterBulan" class="select-bulan">
-                    <option value="0">Januari</option>
-                    <option value="1">Februari</option>
-                    <option value="2">Maret</option>
-                    <option value="3">April</option>
-                    <option value="4">Mei</option>
-                    <option value="5">Juni</option>
-                    <option value="6">Juli</option>
-                    <option value="7">Agustus</option>
-                    <option value="8">September</option>
-                    <option value="9">Oktober</option>
-                    <option value="10">November</option>
-                    <option value="11">Desember</option>
-                </select>
-                <button id="btnDownloadPDF" style="width: 150px; font-family: Tahoma; font-size: 12px; padding: 5px; border: 2px outset #ffffff; background: #e0e0e0; cursor: pointer; display: block; box-sizing: border-box; text-align: center;">
-                    PDF
-                </button>
-             <div style="text-align: right;">
-                <div id="totalRencanaBulan" style="font-size: 30px; font-weight: bold;">Rp 0</div>
+                        <button id="btnDownloadPDF" style="width: 150px; font-family: Tahoma; font-size: 12px; padding: 5px; border: 2px outset #ffffff; background: #e0e0e0; cursor: pointer; box-sizing: border-box; text-align: center;">
+                            PDF
+                        </button>
+                    </div>
+
+                    <div class="filter-container">
+                        <input type="checkbox" id="chkPegawai" class="chk-btn-input chk-jenis" value="PEGAWAI" checked>
+                        <label for="chkPegawai" class="chk-btn-label">Belanja Pegawai</label>
+
+                        <input type="checkbox" id="chkBarangRM" class="chk-btn-input chk-jenis" value="BARANG_RM" checked>
+                        <label for="chkBarangRM" class="chk-btn-label">Belanja Barang ( RM )</label>
+
+                        <input type="checkbox" id="chkBarangPNBP" class="chk-btn-input chk-jenis" value="BARANG_PNBP" checked>
+                        <label for="chkBarangPNBP" class="chk-btn-label">Belanja Barang ( PNBP )</label>
+
+                        <input type="checkbox" id="chkModal" class="chk-btn-input chk-jenis" value="MODAL" checked>
+                        <label for="chkModal" class="chk-btn-label">Belanja Modal</label>
+                    </div>
+                </div>
+                
+                <div style="text-align: right;">
+                    <div id="totalRencanaBulan" style="font-size: 30px; font-weight: bold;">Rp 0</div>
+                </div>
             </div>
-        </div>
+        
         <div class="modal-body">
             <div id="planContainer">
-                </div>
+            </div>
         </div>
 
         <div class="modal-footer" style="padding: 10px; background: #c0c0c0; text-align: right;">
