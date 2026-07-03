@@ -418,6 +418,76 @@
         </div>
     </div>
 </div>
+<button type="button" class="btn-tool" id="btnCap">CAPAIAN</button>
+<div id="modalCapaian" class="classic-modal">
+    <div class="classic-modal-content">
+        <div class="classic-modal-header">
+            <span class="classic-modal-title">Monitoring Capaian Anggaran</span>
+            <button id="closeCapaian" class="classic-close-btn">×</button>
+        </div>
+        <div class="classic-modal-body">
+            <div class="classic-tabs">
+                <h3 id="tabRPD" class="tab-item active">CAPAIAN RPD PER TW</h3>
+            </div>
+            <div class="tw-container">
+                <button type="button" class="btn-tw active" data-tw="1">TW1</button>
+                <button type="button" class="btn-tw" data-tw="2">TW2</button>
+                <button type="button" class="btn-tw" data-tw="3">TW3</button>
+                <button type="button" class="btn-tw" data-tw="4">TW4</button>
+            </div>
+            <div class="cards-wrapper">
+                <div class="classic-card">
+                    <div class="card-header">BELANJA PEGAWAI</div>
+                    <div class="card-body">
+                        <div class="info-group">
+                            <label>PAGU B. PEGAWAI</label>
+                            <div id="paguPegawai" class="nilai-display">Rp 0</div>
+                        </div>
+                        <div class="info-group">
+                            <label id="labelTargetPegawai">RPD</label>
+                            <div id="targetPegawai" class="nilai-display">Rp 0</div>
+                        </div>
+                        <div id="persenPegawai" class="persen-display">0%</div>
+                    </div>
+                </div>
+                <div class="classic-card">
+                    <div class="card-header">BELANJA BARANG</div>
+                    <div class="card-body">
+                        <div class="info-group">
+                            <label>PAGU B. BARANG</label>
+                            <div id="paguBarang" class="nilai-display">Rp 0</div>
+                        </div>
+                        <div class="info-group">
+                            <label id="labelTargetBarang">RPD</label>
+                            <div id="targetBarang" class="nilai-display">Rp 0</div>
+                        </div>
+                        <div id="persenBarang" class="persen-display">0%</div>
+                    </div>
+                </div>
+                <div class="classic-card">
+                    <div class="card-header">BELANJA MODAL</div>
+                    <div class="card-body">
+                        <div class="info-group">
+                            <label>PAGU B. MODAL</label>
+                            <div id="paguModal" class="nilai-display">Rp 0</div>
+                        </div>
+                        <div class="info-group">
+                            <label id="labelTargetModal">RPD</label>
+                            <div id="targetModal" class="nilai-display">Rp 0</div>
+                        </div>
+                        <div id="persenModal" class="persen-display">0%</div>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+    <div class="classic-modal-footer" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+        <small style="color: #666; font-style: italic;">*Note: Total Pagu Sudah Dikurangi Blokir</small>
+        <button id="btnDoneCapaian" class="classic-btn">Selesai</button>
+    </div>
+    </div>
+</div>
 <script src="script.js"></script>
 </body>
 </html>
