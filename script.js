@@ -1440,3 +1440,138 @@ async function unduhPDFPlan(monthIndex, namaBulan) {
         alert("Gagal mencetak dokumen PDF. Silakan periksa log konsol.");
     }
 }
+// ========================= CAPAIAN ======================= //
+document.addEventListener('DOMContentLoaded', () => {
+    const modalCapaian = document.getElementById('modalCapaian');
+    const btnCap = document.getElementById('btnCap');
+    const closeCapaian = document.getElementById('closeCapaian');
+    const btnDoneCapaian = document.getElementById('btnDoneCapaian');
+    const btnsTw = document.querySelectorAll('.btn-tw');
+
+    function resetSemuaTombolTW() {
+        btnsTw.forEach(btn => {
+            btn.classList.add('active');
+        });
+    }
+
+    btnCap.addEventListener('click', () => {
+        modalCapaian.style.display = 'block';
+        resetSemuaTombolTW(); 
+        hitungDanRenderCapaian();
+    });
+
+    closeCapaian.addEventListener('click', () => modalCapaian.style.display = 'none');
+    btnDoneCapaian.addEventListener('click', () => modalCapaian.style.display = 'none');
+
+    btnsTw.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.target.classList.toggle('active');
+            const yangAktif = document.querySelectorAll('.btn-tw.active');
+            if (yangAktif.length === 0) {
+                e.target.classList.add('active');
+            }
+            hitungDanRenderCapaian();
+        });
+    });
+
+    function dapatkanJenisBelanja(kode) {
+        const clean = String(kode).trim();
+        if (clean.startsWith('51')) return 'PEGAWAI';
+        if (clean.startsWith('52')) return 'BARANG';
+        if (clean.startsWith('53')) return 'MODAL';
+        return '';
+    }
+
+    async function hitungDanRenderCapaian() {
+        let rangeBulan = [];
+        btnsTw.forEach(btn => {
+            if (btn.classList.contains('active')) {
+                const tw = parseInt(btn.getAttribute('data-tw'), 10);
+                if (tw === 1) rangeBulan.push(0, 1, 2);     
+                if (tw === 2) rangeBulan.push(3, 4, 5);     
+                if (tw === 3) rangeBulan.push(6, 7, 8);     
+                if (tw === 4) rangeBulan.push(9, 10, 11);    
+            }
+        });
+
+        rangeBulan = [...new Set(rangeBulan)].sort((a, b) => a - b);
+
+        try {
+            const { data, error } = await _supabase
+                .from('anggaran')
+                .select('*')
+                .order('sort_order', { ascending: true }); 
+
+            if (error) throw error;
+
+            let akumulasi = {
+                PEGAWAI: { pagu: 0, blokir: 0, target: 0 }, 
+                BARANG:  { pagu: 0, blokir: 0, target: 0 }, 
+                MODAL:   { pagu: 0, blokir: 0, target: 0 }  
+            };
+
+            data.forEach(item => {
+                const lvl = parseInt(item.level !== undefined ? item.level : item.tingkat, 10);
+                const kelompok = dapatkanJenisBelanja(item.kode);
+
+                if (kelompok && lvl === 3) {
+                    akumulasi[kelompok].pagu += parseFloat(item.pagu) || 0;
+                    akumulasi[kelompok].blokir += parseFloat(item.blokir) || 0; 
+
+                    let targetSource = item.rpd_bulanan;
+                    let arrayNilai = new Array(12).fill(0);
+
+                    if (targetSource !== null && targetSource !== undefined) {
+                        if (Array.isArray(targetSource)) {
+                            arrayNilai = targetSource;
+                        } else if (typeof targetSource === 'object') {
+                            for (let i = 0; i < 12; i++) {
+                                arrayNilai[i] = targetSource[i] || targetSource[String(i)] || 0;
+                            }
+                        } else if (typeof targetSource === 'string') {
+                            let cleanStr = targetSource.trim();
+                            if (cleanStr.startsWith('[') && cleanStr.endsWith(']')) {
+                                try { arrayNilai = JSON.parse(cleanStr); } catch(e) { arrayNilai = new Array(12).fill(0); }
+                            } else if (cleanStr.startsWith('{') && cleanStr.endsWith('}')) {
+                                try {
+                                    let obj = JSON.parse(cleanStr);
+                                    for (let i = 0; i < 12; i++) {
+                                        arrayNilai[i] = obj[i] || obj[String(i)] || 0;
+                                    }
+                                } catch(e) { arrayNilai = new Array(12).fill(0); }
+                            } else if (cleanStr.includes(',')) {
+                                arrayNilai = cleanStr.split(',').map(v => parseFloat(v) || 0);
+                            } else {
+                                arrayNilai[0] = parseFloat(cleanStr) || 0;
+                            }
+                        }
+                    }
+
+                    rangeBulan.forEach(idxBulan => {
+                        akumulasi[kelompok].target += parseFloat(arrayNilai[idxBulan]) || 0;
+                    });
+                }
+            });
+
+            ['PEGAWAI', 'BARANG', 'MODAL'].forEach(key => {
+                const dataGrup = akumulasi[key];
+                const idKey = key.toLowerCase().charAt(0).toUpperCase() + key.toLowerCase().slice(1);
+
+                // Mengurangi Pagu dengan nilai Blokir
+                const paguDikurangiBlokir = dataGrup.pagu - dataGrup.blokir;
+
+                let hitungPersen = 0;
+                if (paguDikurangiBlokir > 0) {
+                    hitungPersen = Math.round((dataGrup.target / paguDikurangiBlokir) * 100);
+                }
+
+                document.getElementById(`pagu${idKey}`).innerText = toRp(paguDikurangiBlokir);
+                document.getElementById(`target${idKey}`).innerText = toRp(dataGrup.target);
+                document.getElementById(`persen${idKey}`).innerText = `${hitungPersen}%`;
+            });
+
+        } catch (err) {
+            console.error("Gagal memproses data capaian RPD:", err);
+        }
+    }
+});
